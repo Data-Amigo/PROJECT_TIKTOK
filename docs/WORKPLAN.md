@@ -98,9 +98,12 @@ logs that can reconstruct any incident.
       expire (we store our own copy) and emojis are everywhere (UTF-8 or die).
       *You learned:* Apify's actor/run/dataset model; letting real data drive
       the schema instead of guessing.
-- [ ] **0.1 Backend skeleton** — Python venv, FastAPI app (`main.py`, `config.py`),
-      `/health` endpoint, `requirements.txt`.
-      *You learn:* FastAPI app anatomy, why config lives in env vars (12-factor).
+- [x] **0.1 Backend skeleton** — venv, FastAPI app (`main.py`, `config.py`),
+      liveness `/health`, pinned `requirements.txt`, first 2 tests green.
+      Backend runs on **port 8100** (8000 belongs to mali-jubilee-poc on this
+      machine). Design: /health = liveness only; readiness `checks` grow in 0.2.
+      *You learned:* FastAPI anatomy, typed config via pydantic-settings,
+      liveness vs readiness, in-process TestClient.
 - [ ] **0.2 Database layer** — `docker-compose.yml` (Postgres + Redis), `db.py`
       (SQLAlchemy engine + session), Alembic init + first empty migration.
       *You learn:* why migrations exist, the engine/session pattern, what Redis
