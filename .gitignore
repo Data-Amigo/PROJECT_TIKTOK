@@ -26,6 +26,9 @@ openwa/session*/
 openwa/data/
 *.session
 
+# --- Spike output (scraped media / raw dumps never go in git) ---
+backend/spikes/out/
+
 # --- Databases / local data ---
 *.sqlite
 *.sqlite3

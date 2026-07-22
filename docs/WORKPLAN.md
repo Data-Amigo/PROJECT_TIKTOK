@@ -88,12 +88,16 @@ logs that can reconstruct any incident.
 
 *Goal: all services boot; `/health` returns 200.*
 
-- [ ] **0.0 Data spike** — standalone script: real Kenyan seller's TikTok →
-      Apify actor run → inspect the JSON we actually get (captions, covers,
-      prices-in-captions?) → download a thumbnail to disk. Findings shape the
-      `Product` model in 1.1.
-      *You learn:* Apify's actor/run/dataset model; letting real data drive the
-      schema instead of guessing.
+- [x] **0.0 Data spike** — `backend/spikes/spike_00_apify_tiktok.py` ran against
+      a real seller (kinjobales_wholesale, 1.4M followers, 10 videos). Findings:
+      **captions are hashtag soup — no prices, no product names** → the product
+      draft must come from the COVER IMAGE (vision LLM) + hashtag category hints,
+      seller confirms price. Bio carries shop addresses + phones → auto-fill
+      onboarding. `commerceUserInfo` flags sellers. No transcriptions for
+      Swahili content (own-ASR is a future project). Confirmed live: cover URLs
+      expire (we store our own copy) and emojis are everywhere (UTF-8 or die).
+      *You learned:* Apify's actor/run/dataset model; letting real data drive
+      the schema instead of guessing.
 - [ ] **0.1 Backend skeleton** — Python venv, FastAPI app (`main.py`, `config.py`),
       `/health` endpoint, `requirements.txt`.
       *You learn:* FastAPI app anatomy, why config lives in env vars (12-factor).
@@ -120,9 +124,10 @@ frontend shows the backend is healthy.
       *You learn:* SQLAlchemy models, relationships, migration workflow for real.
 - [ ] **1.2 🤖 Scraper service** — `services/scraper.py`: Apify engine behind our
       own interface (`fetch_video`, `fetch_profile`) → caption, cover, metadata;
-      thumbnails stored by us. First agentic piece: an LLM turns a messy caption
-      into a structured product draft (name, description, suggested tags) —
-      the seller confirms; the LLM never sets price/stock.
+      thumbnails stored by us. First agentic piece: a VISION LLM reads the cover
+      image (+ hashtag hints — spike 00 proved captions carry no product info)
+      and drafts name/description/tags — the seller confirms; the LLM never
+      sets price/stock.
       *You learn:* tool-building for agents, structured output, why we validate
       LLM output with schemas instead of trusting it.
 - [ ] **1.3 Products API** — `api/products.py`: create-from-link, set price/stock,
@@ -262,3 +267,4 @@ first on purpose.
 |------|---------------|
 | 2026-07-22 | Repo initialized, first commit pushed to `Data-Amigo/PROJECT_TIKTOK`; workplan written |
 | 2026-07-22 | Data decision: Apify actor as scrape engine (key acquired); Display API later, oEmbed as edge fallback. Quality bar set: production-grade POC |
+| 2026-07-22 | Spike 00 done on real seller data. Key insight: captions have NO product info → product draft comes from cover image (vision LLM), not caption parsing. Bio = auto-fill onboarding data |
