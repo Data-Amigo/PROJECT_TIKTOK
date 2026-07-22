@@ -113,8 +113,13 @@ logs that can reconstruct any incident.
       idempotency actually needs them.
       *You learned:* engine-vs-session mental model, migrations as schema
       version control, blast radius, liveness-vs-readiness in practice.
-- [ ] **0.3 Frontend skeleton** — Next.js (TypeScript + Tailwind) app, hello page.
-      *You learn:* App Router layout, where `[handle]` dynamic routes fit.
+- [x] **0.3 Frontend skeleton** — Next 16 + React 19 + Tailwind 4 via
+      create-next-app; dev server on :3000. npm audit findings triaged (in
+      Next's bundled deps; "fix" was a Next 9 downgrade — declined with eyes
+      open). Placeholder .gitkeep dirs replaced by real scaffold; `[handle]`
+      + `dashboard` routes return in M1 when they earn existence.
+      *You learned:* App Router (folders = routes), server components (HTML
+      to the phone, not JS bundles — the Kenyan-mobile reason), audit triage.
 - [ ] **0.4 Wire-up** — frontend calls backend `/health` and shows the status;
       `.env.example` listing every key the app will ever need.
       *You learn:* CORS, the frontend↔backend contract, secret hygiene.
