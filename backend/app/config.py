@@ -51,9 +51,20 @@ class Settings(BaseSettings):
     # and fails with a human message, same pattern as the spike.
     apify_api_token: str = ""
 
-    # Placeholder until 0.2 makes Postgres real — then it loses its default
-    # and becomes required.
-    database_url: str = ""
+    # REQUIRED (no default): the app refuses to boot without a database.
+    # Points at BOB's OWN Railway Postgres — never a shared one. We learned
+    # this the concrete way: the first URL we tried held 28 tables from two
+    # other projects, including a `products` table our migrations could have
+    # mangled. One database per application, always.
+    database_url: str
+
+    @property
+    def sqlalchemy_database_url(self) -> str:
+        """Railway hands out postgresql:// ; SQLAlchemy 2 + psycopg3 needs the
+        explicit postgresql+psycopg:// dialect. Translate HERE, once, so no
+        other module ever thinks about URL schemes. .env stays exactly as
+        Railway gave it (easy to re-paste on rotation)."""
+        return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
 
 # The one instance the whole app shares. Import THIS, never instantiate again —

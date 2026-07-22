@@ -104,10 +104,15 @@ logs that can reconstruct any incident.
       machine). Design: /health = liveness only; readiness `checks` grow in 0.2.
       *You learned:* FastAPI anatomy, typed config via pydantic-settings,
       liveness vs readiness, in-process TestClient.
-- [ ] **0.2 Database layer** — `docker-compose.yml` (Postgres + Redis), `db.py`
-      (SQLAlchemy engine + session), Alembic init + first empty migration.
-      *You learn:* why migrations exist, the engine/session pattern, what Redis
-      will be for later (idempotency, pacing).
+- [x] **0.2 Database layer** — Railway Postgres (BOB's OWN database — first
+      URL was shared with 2 other projects incl. a `products` table collision;
+      rule learned: one database per application). `db.py` with pool_pre_ping
+      + pool_recycle (cloud DBs drop idle connections), Alembic wired to
+      app config (single URL source), init migration applied, `/health` now
+      reports db readiness. Redis + docker-compose deferred to M3 when
+      idempotency actually needs them.
+      *You learned:* engine-vs-session mental model, migrations as schema
+      version control, blast radius, liveness-vs-readiness in practice.
 - [ ] **0.3 Frontend skeleton** — Next.js (TypeScript + Tailwind) app, hello page.
       *You learn:* App Router layout, where `[handle]` dynamic routes fit.
 - [ ] **0.4 Wire-up** — frontend calls backend `/health` and shows the status;

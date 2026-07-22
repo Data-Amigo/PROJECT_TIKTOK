@@ -13,8 +13,10 @@ file in here grows past ~100 lines, something is in the wrong place.
 """
 
 from fastapi import FastAPI
+from sqlalchemy import text
 
 from app.config import settings
+from app.db import engine
 
 # ── APP ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -31,21 +33,33 @@ app = FastAPI(
 # ── HEALTH ────────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health() -> dict:
-    """Liveness: is the process up and its config loaded? Always cheap.
+    """Process liveness + dependency readiness, in one honest report.
 
-    Deliberately does NOT touch Postgres/Redis — liveness and readiness are
-    different questions. If health depended on the DB, a DB blip would make
-    the platform restart a perfectly fine process (a restart cannot fix a
-    down database). Instead, the `checks` map grows a real dependency report
-    in 0.2, so a tester's bug report names the dependency that died.
+    The liveness/readiness split, kept: this endpoint ALWAYS answers 200 —
+    a down database must not make the platform restart a fine process (a
+    restart can't fix Postgres). Instead `status` flips to "degraded" and
+    `checks` names the dead dependency, so a tester's bug report says
+    "db: down" instead of "it's broken".
     """
+    checks = {"api": "ok"}
+
+    # DB readiness: cheapest possible round-trip (SELECT 1). pool_pre_ping +
+    # the 10s connect timeout in db.py bound how long this can take.
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        checks["db"] = "ok"
+    except Exception:
+        # Deliberately broad: ANY failure mode (DNS, auth, timeout, Railway
+        # asleep) reports the same way. Detail goes in logs, not to strangers.
+        checks["db"] = "down"
+
+    # checks["redis"] joins in M3, when Redis actually exists.
+
+    all_ok = all(v == "ok" for v in checks.values())
     return {
-        "status": "ok",
+        "status": "ok" if all_ok else "degraded",
         "service": settings.app_name,
         "env": settings.app_env,
-        "checks": {
-            "api": "ok",
-            # "db": …      arrives in session 0.2
-            # "redis": …   arrives in session 0.2
-        },
+        "checks": checks,
     }

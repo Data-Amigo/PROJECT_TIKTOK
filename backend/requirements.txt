@@ -11,6 +11,11 @@ pydantic==2.13.4
 pydantic-settings==2.14.2        # typed .env loading (app/config.py)
 python-dotenv==1.2.2             # spike scripts read .env directly
 
+# ── Database ──────────────────────────────────────────────
+sqlalchemy==2.0.51
+psycopg[binary]==3.3.4           # the actual Postgres driver (binary = no compiler needed)
+alembic==1.18.5                  # schema migrations (backend/alembic/)
+
 # ── HTTP clients ──────────────────────────────────────────
 requests==2.34.2                 # sync client (spikes); services move to httpx
 httpx==0.28.1                    # async-capable client + powers TestClient

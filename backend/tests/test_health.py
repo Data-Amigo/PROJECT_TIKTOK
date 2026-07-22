@@ -28,3 +28,12 @@ def test_health_reports_its_checks():
     dependency — make sure it exists and the api itself reports ok."""
     body = client.get("/health").json()
     assert body["checks"]["api"] == "ok"
+
+
+def test_health_reports_db_readiness():
+    """DB check present and ok. NOTE: this test does a real round-trip to
+    Railway (~200ms) — acceptable while the suite is small; if it ever gets
+    annoying, this is the first test to move behind a marker."""
+    body = client.get("/health").json()
+    assert body["checks"]["db"] == "ok"
+    assert body["status"] == "ok"
