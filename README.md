@@ -1,4 +1,4 @@
-# Project TICKTOCK — BOB for Commerce
+# Project TIKTOK — BOB for Commerce
 
 An AI agent that turns a TikTok/Instagram post into a complete sale — **post once, sell everywhere.**
 
@@ -42,7 +42,7 @@ Payment and contact capture are one step. Every order becomes a clean row:
 ## Folder map
 
 ```
-Project TICKTOCK/
+Project TIKTOK/
 ├─ frontend/          Next.js — the BOB Page + seller dashboard + checkout form
 │  ├─ app/
 │  │  ├─ [handle]/    public page: bob.link/mama-wanjiku

@@ -1,4 +1,4 @@
-# WORKPLAN — Project TICKTOCK (BOB for Commerce)
+# WORKPLAN — Project TIKTOK (BOB for Commerce)
 
 > **How to read this file:** this is the living build plan. Each milestone (M0–M6)
 > is broken into small **sessions** — one sitting each. A session ends with something
@@ -98,21 +98,38 @@ logs that can reconstruct any incident.
       expire (we store our own copy) and emojis are everywhere (UTF-8 or die).
       *You learned:* Apify's actor/run/dataset model; letting real data drive
       the schema instead of guessing.
-- [ ] **0.1 Backend skeleton** — Python venv, FastAPI app (`main.py`, `config.py`),
-      `/health` endpoint, `requirements.txt`.
-      *You learn:* FastAPI app anatomy, why config lives in env vars (12-factor).
-- [ ] **0.2 Database layer** — `docker-compose.yml` (Postgres + Redis), `db.py`
-      (SQLAlchemy engine + session), Alembic init + first empty migration.
-      *You learn:* why migrations exist, the engine/session pattern, what Redis
-      will be for later (idempotency, pacing).
-- [ ] **0.3 Frontend skeleton** — Next.js (TypeScript + Tailwind) app, hello page.
-      *You learn:* App Router layout, where `[handle]` dynamic routes fit.
-- [ ] **0.4 Wire-up** — frontend calls backend `/health` and shows the status;
-      `.env.example` listing every key the app will ever need.
-      *You learn:* CORS, the frontend↔backend contract, secret hygiene.
+- [x] **0.1 Backend skeleton** — venv, FastAPI app (`main.py`, `config.py`),
+      liveness `/health`, pinned `requirements.txt`, first 2 tests green.
+      Backend runs on **port 8100** (8000 belongs to mali-jubilee-poc on this
+      machine). Design: /health = liveness only; readiness `checks` grow in 0.2.
+      *You learned:* FastAPI anatomy, typed config via pydantic-settings,
+      liveness vs readiness, in-process TestClient.
+- [x] **0.2 Database layer** — Railway Postgres (BOB's OWN database — first
+      URL was shared with 2 other projects incl. a `products` table collision;
+      rule learned: one database per application). `db.py` with pool_pre_ping
+      + pool_recycle (cloud DBs drop idle connections), Alembic wired to
+      app config (single URL source), init migration applied, `/health` now
+      reports db readiness. Redis + docker-compose deferred to M3 when
+      idempotency actually needs them.
+      *You learned:* engine-vs-session mental model, migrations as schema
+      version control, blast radius, liveness-vs-readiness in practice.
+- [x] **0.3 Frontend skeleton** — Next 16 + React 19 + Tailwind 4 via
+      create-next-app; dev server on :3000. npm audit findings triaged (in
+      Next's bundled deps; "fix" was a Next 9 downgrade — declined with eyes
+      open). Placeholder .gitkeep dirs replaced by real scaffold; `[handle]`
+      + `dashboard` routes return in M1 when they earn existence.
+      *You learned:* App Router (folders = routes), server components (HTML
+      to the phone, not JS bundles — the Kenyan-mobile reason), audit triage.
+- [x] **0.4 Wire-up** — CORS middleware (origin-locked, wildcard forbidden,
+      2 tests incl. evil-origin rejection); `lib/api.ts` as the frontend's only
+      backend door; status page = server component rendering live /health with
+      a designed backend-unreachable state. `NEXT_PUBLIC_` rule learned: values
+      are INLINED into the browser bundle at build time — never secrets.
+      *You learned:* CORS is a browser rule (server fetches skip it), Next 16
+      fetch is uncached by default, the API-client-module pattern.
 
-**Done when:** `docker compose up` + uvicorn + `npm run dev` all boot and the
-frontend shows the backend is healthy.
+**Done when:** uvicorn + `npm run dev` boot and the frontend shows the backend
+is healthy. ✅ MET 2026-07-23 — page renders api: ok · db: ok end to end.
 
 ---
 
@@ -268,3 +285,4 @@ first on purpose.
 | 2026-07-22 | Repo initialized, first commit pushed to `Data-Amigo/PROJECT_TIKTOK`; workplan written |
 | 2026-07-22 | Data decision: Apify actor as scrape engine (key acquired); Display API later, oEmbed as edge fallback. Quality bar set: production-grade POC |
 | 2026-07-22 | Spike 00 done on real seller data. Key insight: captions have NO product info → product draft comes from cover image (vision LLM), not caption parsing. Bio = auto-fill onboarding data |
+| 2026-07-23 | GitHub issue log live (milestone M0, issues #1–#5). Branding renamed TIKTOK. Session 0.4 wired frontend↔backend↔DB — **M0 done-when met**, merged to main |
