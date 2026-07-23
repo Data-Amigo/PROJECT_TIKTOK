@@ -45,6 +45,19 @@ class Settings(BaseSettings):
     app_name: str = "BOB for Commerce"
     app_env: str = "dev"             # dev | staging | prod — gates docs page etc.
 
+    # ── CORS ──
+    # Which BROWSER origins may call this API (server-to-server calls ignore
+    # CORS entirely — it's a browser rule). Comma-separated so prod can add
+    # the real domain via env: "https://bob.link,https://www.bob.link".
+    # NEVER "*": a wildcard would let any website on the internet script
+    # requests against our API from its visitors' browsers.
+    cors_origins: str = "http://localhost:3000"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """The comma-separated env string, split and cleaned for FastAPI."""
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     # ── External services ──
     # Empty-string default (not required) because M0 must boot on a fresh
     # clone with zero keys; the scraper service (M1.2) checks it at CALL time

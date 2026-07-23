@@ -13,6 +13,7 @@ file in here grows past ~100 lines, something is in the wrong place.
 """
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.config import settings
@@ -27,6 +28,18 @@ app = FastAPI(
     # nobody has to remember later.
     docs_url="/docs" if settings.app_env == "dev" else None,
     redoc_url=None,  # one docs UI is enough
+)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# Lets pages served from our frontend origin call this API FROM THE BROWSER
+# (dashboard forms, checkout). Server-side fetches (Next.js server components)
+# never hit this — CORS is purely a browser-enforced rule. Origins come from
+# config; wildcard is forbidden there, see config.py for the why.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_methods=["*"],   # fine to be broad once the ORIGIN is locked down
+    allow_headers=["*"],
 )
 
 

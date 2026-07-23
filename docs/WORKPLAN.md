@@ -120,12 +120,16 @@ logs that can reconstruct any incident.
       + `dashboard` routes return in M1 when they earn existence.
       *You learned:* App Router (folders = routes), server components (HTML
       to the phone, not JS bundles — the Kenyan-mobile reason), audit triage.
-- [ ] **0.4 Wire-up** — frontend calls backend `/health` and shows the status;
-      `.env.example` listing every key the app will ever need.
-      *You learn:* CORS, the frontend↔backend contract, secret hygiene.
+- [x] **0.4 Wire-up** — CORS middleware (origin-locked, wildcard forbidden,
+      2 tests incl. evil-origin rejection); `lib/api.ts` as the frontend's only
+      backend door; status page = server component rendering live /health with
+      a designed backend-unreachable state. `NEXT_PUBLIC_` rule learned: values
+      are INLINED into the browser bundle at build time — never secrets.
+      *You learned:* CORS is a browser rule (server fetches skip it), Next 16
+      fetch is uncached by default, the API-client-module pattern.
 
-**Done when:** `docker compose up` + uvicorn + `npm run dev` all boot and the
-frontend shows the backend is healthy.
+**Done when:** uvicorn + `npm run dev` boot and the frontend shows the backend
+is healthy. ✅ MET 2026-07-23 — page renders api: ok · db: ok end to end.
 
 ---
 
@@ -281,3 +285,4 @@ first on purpose.
 | 2026-07-22 | Repo initialized, first commit pushed to `Data-Amigo/PROJECT_TIKTOK`; workplan written |
 | 2026-07-22 | Data decision: Apify actor as scrape engine (key acquired); Display API later, oEmbed as edge fallback. Quality bar set: production-grade POC |
 | 2026-07-22 | Spike 00 done on real seller data. Key insight: captions have NO product info → product draft comes from cover image (vision LLM), not caption parsing. Bio = auto-fill onboarding data |
+| 2026-07-23 | GitHub issue log live (milestone M0, issues #1–#5). Branding renamed TIKTOK. Session 0.4 wired frontend↔backend↔DB — **M0 done-when met**, merged to main |

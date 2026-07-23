@@ -30,6 +30,21 @@ def test_health_reports_its_checks():
     assert body["checks"]["api"] == "ok"
 
 
+def test_cors_allows_the_frontend_origin():
+    """A browser at localhost:3000 must be allowed to read our responses.
+    The middleware only emits the header when the request CARRIES an Origin —
+    that's why the test sends one (a plain curl never sees CORS headers)."""
+    resp = client.get("/health", headers={"Origin": "http://localhost:3000"})
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_cors_rejects_unknown_origins():
+    """An arbitrary website must NOT get the allow header — its visitors'
+    browsers will then refuse to hand it our responses."""
+    resp = client.get("/health", headers={"Origin": "https://evil.example"})
+    assert "access-control-allow-origin" not in resp.headers
+
+
 def test_health_reports_db_readiness():
     """DB check present and ok. NOTE: this test does a real round-trip to
     Railway (~200ms) — acceptable while the suite is small; if it ever gets
