@@ -21,7 +21,7 @@ from app.db import Base
 # Import models so their tables register on Base.metadata BEFORE autogenerate
 # diffs it against the live DB. A model that isn't imported here is INVISIBLE
 # to Alembic — it would generate a migration that DROPS the "unknown" table.
-# (Models arrive in M1.1; the import will be:  from app import models  )
+from app import models  # noqa: F401  (imported for its side effect: registration)
 
 config = context.config
 
