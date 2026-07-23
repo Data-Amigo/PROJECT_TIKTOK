@@ -1,4 +1,4 @@
-# WORKPLAN — Project TICKTOCK (BOB for Commerce)
+# WORKPLAN — Project TIKTOK (BOB for Commerce)
 
 > **How to read this file:** this is the living build plan. Each milestone (M0–M6)
 > is broken into small **sessions** — one sitting each. A session ends with something
