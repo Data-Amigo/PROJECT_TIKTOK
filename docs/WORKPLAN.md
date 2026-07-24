@@ -293,3 +293,4 @@ first on purpose.
 | 2026-07-22 | Data decision: Apify actor as scrape engine (key acquired); Display API later, oEmbed as edge fallback. Quality bar set: production-grade POC |
 | 2026-07-22 | Spike 00 done on real seller data. Key insight: captions have NO product info → product draft comes from cover image (vision LLM), not caption parsing. Bio = auto-fill onboarding data |
 | 2026-07-23 | GitHub issue log live (milestone M0, issues #1–#5). Branding renamed TIKTOK. Session 0.4 wired frontend↔backend↔DB — **M0 done-when met**, merged to main |
+| 2026-07-24 | M1.2 scraper (Apify adapter, validation border) + 🤖 draft agent. Model decision: **Gemini (gemini-3.6-flash) for vision** — reads Sheng/Swahili better than Anthropic (tested); Anthropic reserved for conversation. Live proof: hashtag-only cover → clean product draft, Sheng text translated, no price/stock (guardrail held) |
