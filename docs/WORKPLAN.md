@@ -169,8 +169,15 @@ is healthy. ✅ MET 2026-07-23 — page renders api: ok · db: ok end to end.
       32 green. (#11)
       *You learned:* pydantic wire schemas vs DB models, service→route split,
       transactional test fixtures, error→HTTP-status mapping (502/400/404).
-- [ ] **1.4 Dashboard UI** — paste link → preview draft → set price + stock → publish.
-      *You learn:* calling the API from Next.js, shared types in `shared/schemas/`.
+- [x] **1.4 Dashboard UI** — `app/dashboard/page.tsx` (paste handle → ingest →
+      card grid) + `components/ProductCard.tsx` (auto-fill → edit → price/stock →
+      publish; publish disabled without a price) + `lib/api.ts` typed client.
+      Backend: `/media` static mount so covers display. Proven live end to end
+      (ingest → cover serves → autofill named the product off the image →
+      publish → public page). Typechecks + production-builds. (#12)
+      *You learned:* client vs server components (this is a client component,
+      talks to the backend from the browser → CORS), lifting state, the
+      API-client-module pattern, designed loading/error/empty states.
 - [ ] **1.5 Public page** — `[handle]/page.tsx`: today's drop, live
       Available/SOLD badge.
       *You learn:* server components, dynamic routes, why the public page reads
@@ -306,3 +313,4 @@ first on purpose.
 | 2026-07-23 | GitHub issue log live (milestone M0, issues #1–#5). Branding renamed TIKTOK. Session 0.4 wired frontend↔backend↔DB — **M0 done-when met**, merged to main |
 | 2026-07-24 | M1.2 scraper (Apify adapter, validation border) + 🤖 draft agent. Model decision: **Gemini (gemini-3.6-flash) for vision** — reads Sheng/Swahili better than Anthropic (tested); Anthropic reserved for conversation. Live proof: hashtag-only cover → clean product draft, Sheng text translated, no price/stock (guardrail held) |
 | 2026-07-25 | M1.3 Products API — ingest/autofill/patch/public-page across schemas/service/routes; drafting split to on-demand (cost rail); 9 tests, 32 green (#11). CONCEPTS.md added (why-not-RAG etc.); Phase 2 generative try-on recorded |
+| 2026-07-25 | M1.4 Dashboard UI — Next.js seller screen (paste→ingest→autofill→price→publish), /media static mount. Live proof: real kinjobales ingest → Gemini named "Sundabests Insulated Beverage Dispenser" off the cover → published → public page (#12) |
