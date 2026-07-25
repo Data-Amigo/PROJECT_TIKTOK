@@ -107,4 +107,6 @@ vs extraction; the model proposes a clip, code decides if it's allowed).
 
 - [x] Folder skeleton
 - [x] Plan set to web-first
-- [ ] M0 — Foundation (in progress)
+- [x] M0 — Foundation (all services boot, `/health` green)
+- [x] M1 — BOB Page (seller pastes handle → drafts → price/publish → public `bob.link/<handle>` with live availability)
+- [ ] M2 — Checkout + contact capture (next)

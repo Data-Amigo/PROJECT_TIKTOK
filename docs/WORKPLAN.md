@@ -151,7 +151,7 @@ is healthy. ✅ MET 2026-07-23 — page renders api: ok · db: ok end to end.
       keeps Railway at 0 rows.
       *You learned:* constraints as rails, money-as-integers, enum strategy,
       store-facts-compute-states, testing against a live DB without pollution.
-- [ ] **1.2 🤖 Scraper service** — `services/scraper.py`: Apify engine behind our
+- [x] **1.2 🤖 Scraper service** — `services/scraper.py`: Apify engine behind our
       own interface (`fetch_video`, `fetch_profile`) → caption, cover, metadata;
       thumbnails stored by us. First agentic piece: a VISION LLM reads the cover
       image (+ hashtag hints — spike 00 proved captions carry no product info)
@@ -178,13 +178,21 @@ is healthy. ✅ MET 2026-07-23 — page renders api: ok · db: ok end to end.
       *You learned:* client vs server components (this is a client component,
       talks to the backend from the browser → CORS), lifting state, the
       API-client-module pattern, designed loading/error/empty states.
-- [ ] **1.5 Public page** — `[handle]/page.tsx`: today's drop, live
-      Available/SOLD badge.
-      *You learn:* server components, dynamic routes, why the public page reads
-      stock from the DB (single source of truth) not from the scrape.
+- [x] **1.5 Public page** — `app/[handle]/page.tsx` (server component) +
+      `PublicProductCard` + `OrderButton` + `not-found.tsx` + `error.tsx`.
+      Production polish for real customer testing: rich OG/Twitter metadata
+      (shared links preview on TikTok/WhatsApp), live stock (no-store fetch),
+      real 404 vs error boundaries, mobile-first grid, honest "checkout coming
+      soon" CTA. React `cache()` dedupes the metadata+page fetch. Verified live
+      + screenshotted on a real published shop. (#13)
+      *You learned:* server components + dynamic routes, generateMetadata/OG for
+      social sharing, notFound() vs error boundaries, no-store for live data,
+      why the public page reads stock from the DB not the scrape.
 
 **Done when:** a seller pastes a real TikTok link and a public `bob.link/handle`
-page shows the item with live availability.
+page shows the item with live availability. ✅ MET 2026-07-25 — proven live end
+to end (kinjobales ingest → autofill → publish → public page renders the item,
+price, Available badge).
 
 ---
 
@@ -314,3 +322,4 @@ first on purpose.
 | 2026-07-24 | M1.2 scraper (Apify adapter, validation border) + 🤖 draft agent. Model decision: **Gemini (gemini-3.6-flash) for vision** — reads Sheng/Swahili better than Anthropic (tested); Anthropic reserved for conversation. Live proof: hashtag-only cover → clean product draft, Sheng text translated, no price/stock (guardrail held) |
 | 2026-07-25 | M1.3 Products API — ingest/autofill/patch/public-page across schemas/service/routes; drafting split to on-demand (cost rail); 9 tests, 32 green (#11). CONCEPTS.md added (why-not-RAG etc.); Phase 2 generative try-on recorded |
 | 2026-07-25 | M1.4 Dashboard UI — Next.js seller screen (paste→ingest→autofill→price→publish), /media static mount. Live proof: real kinjobales ingest → Gemini named "Sundabests Insulated Beverage Dispenser" off the cover → published → public page (#12) |
+| 2026-07-25 | M1.5 Public BOB Page — server-rendered bob.link/<handle>, OG previews, 404+error boundaries, mobile-first, honest checkout-coming CTA. Screenshotted live. **M1 done-when met** → merge to main (#13) |
