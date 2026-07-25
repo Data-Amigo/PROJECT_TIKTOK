@@ -15,6 +15,11 @@
 
 ## Ground rules (our working agreement)
 
+0. **Document as we build.** Every session is documented in three places, no step
+   skipped: the **status log** here (terse timeline), a **GitHub issue** (goal +
+   done-when + what was learned), and — when a session introduces a new *idea* —
+   [CONCEPTS.md](CONCEPTS.md), the evergreen learning companion. Code itself stays
+   heavily commented (the *why*, not just the *what*).
 1. **Explain → build → review → commit.** Before code is written we agree on what
    and why. After it works, we walk the code together before committing.
 2. **Heavily commented code.** Comments explain *why*, not just what

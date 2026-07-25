@@ -92,6 +92,15 @@ Once there's traction and Meta Business verification is done, add a WhatsApp cha
 behind the same `services/` interface and upgrade the consented contact list from SMS to
 WhatsApp. Nothing built here is wasted.
 
+## Phase 2: generative virtual try-on (select businesses)
+
+A buyer uploads a photo of themselves and Gemini generates a short video of them
+**wearing / using the product**. Offered only to particular businesses (it's a
+paid, higher-tier feature) and built behind hard rails — per-seller feature flag,
+per-buyer cost caps + rate limits, content-safety and likeness-consent checks.
+See [docs/CONCEPTS.md](docs/CONCEPTS.md) §5 for the agentic framing (generation
+vs extraction; the model proposes a clip, code decides if it's allowed).
+
 ---
 
 ## Status
