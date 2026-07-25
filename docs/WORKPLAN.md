@@ -159,10 +159,16 @@ is healthy. ✅ MET 2026-07-23 — page renders api: ok · db: ok end to end.
       sets price/stock.
       *You learn:* tool-building for agents, structured output, why we validate
       LLM output with schemas instead of trusting it.
-- [ ] **1.3 Products API** — `api/products.py`: create-from-link, set price/stock,
-      get-by-handle. Tests with pytest.
-      *You learn:* Pydantic request/response schemas, the service→route split,
-      first real tests.
+- [x] **1.3 Products API** — `api/products.py` + `services/products.py` +
+      `schemas/product.py`. Endpoints: `POST /api/products/ingest` (scrape→DRAFT,
+      idempotent), `POST /api/products/{id}/autofill` (🤖 agent, words only —
+      drafting split out as its own on-demand step so ingest stays cheap/fast),
+      `PATCH /api/products/{id}` (seller sets price/stock, publish-needs-price),
+      `GET /api/pages/{handle}` (buyer view, narrower shape). 9 tests (money
+      path on real Postgres via rolled-back sessions; scraper+agent mocked);
+      32 green. (#11)
+      *You learned:* pydantic wire schemas vs DB models, service→route split,
+      transactional test fixtures, error→HTTP-status mapping (502/400/404).
 - [ ] **1.4 Dashboard UI** — paste link → preview draft → set price + stock → publish.
       *You learn:* calling the API from Next.js, shared types in `shared/schemas/`.
 - [ ] **1.5 Public page** — `[handle]/page.tsx`: today's drop, live
@@ -299,3 +305,4 @@ first on purpose.
 | 2026-07-22 | Spike 00 done on real seller data. Key insight: captions have NO product info → product draft comes from cover image (vision LLM), not caption parsing. Bio = auto-fill onboarding data |
 | 2026-07-23 | GitHub issue log live (milestone M0, issues #1–#5). Branding renamed TIKTOK. Session 0.4 wired frontend↔backend↔DB — **M0 done-when met**, merged to main |
 | 2026-07-24 | M1.2 scraper (Apify adapter, validation border) + 🤖 draft agent. Model decision: **Gemini (gemini-3.6-flash) for vision** — reads Sheng/Swahili better than Anthropic (tested); Anthropic reserved for conversation. Live proof: hashtag-only cover → clean product draft, Sheng text translated, no price/stock (guardrail held) |
+| 2026-07-25 | M1.3 Products API — ingest/autofill/patch/public-page across schemas/service/routes; drafting split to on-demand (cost rail); 9 tests, 32 green (#11). CONCEPTS.md added (why-not-RAG etc.); Phase 2 generative try-on recorded |

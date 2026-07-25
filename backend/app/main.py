@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.api import products as products_api
 from app.config import settings
 from app.db import engine
 
@@ -41,6 +42,11 @@ app.add_middleware(
     allow_methods=["*"],   # fine to be broad once the ORIGIN is locked down
     allow_headers=["*"],
 )
+
+# ── ROUTERS ───────────────────────────────────────────────────────────────────
+# Each resource area is its own router in api/; main just registers them.
+app.include_router(products_api.router)        # /api/products/*  (seller)
+app.include_router(products_api.pages_router)  # /api/pages/*     (buyer)
 
 
 # ── HEALTH ────────────────────────────────────────────────────────────────────
