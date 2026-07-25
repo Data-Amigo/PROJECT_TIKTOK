@@ -17,7 +17,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.agent.draft import DraftError
+from app.agent.draft import DraftError, DraftQuotaError
 from app.db import get_db
 from app.models.product import Product
 from app.schemas.product import (
@@ -55,6 +55,9 @@ def autofill(product_id: int, db: Session = Depends(get_db)) -> AutofillOut:
         product, draft = svc.autofill_product(db, product_id)
     except svc.ProductError as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
+    except DraftQuotaError as e:
+        # AI usage cap — 429 so clients can distinguish "busy, retry" from a real fault.
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(e)) from e
     except DraftError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
     return AutofillOut(

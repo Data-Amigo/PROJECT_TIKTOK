@@ -46,6 +46,11 @@ class DraftError(Exception):
     """Any failure producing a draft, with a message fit for log and human."""
 
 
+class DraftQuotaError(DraftError):
+    """The vision model hit its usage cap (HTTP 429). Distinct so the API can
+    return 429 (Too Many Requests) and the UI can say 'try later', not 'broken'."""
+
+
 # ── OUTPUT SCHEMA (the guarantee + the guardrail) ─────────────────────────────
 class ProductDraft(BaseModel):
     """What the agent is ALLOWED to produce.
@@ -157,8 +162,20 @@ def draft_from_video(
                 response_schema=ProductDraft,
             ),
         )
-    except Exception as e:  # google-genai raises various API errors; treat uniformly
-        raise DraftError(f"Gemini draft call failed: {e}") from e
+    except Exception as e:
+        # Classify so callers can react correctly and sellers see plain language.
+        # The raw google-genai error is a wall of JSON — never show it to a seller.
+        msg = str(e)
+        code = getattr(e, "code", None)
+        if code == 429 or "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+            raise DraftQuotaError(
+                "The image reader has reached today's usage limit. "
+                "Try again later, or ask the owner to raise the AI quota. "
+                "You can still fill in the details by hand."
+            ) from e
+        raise DraftError(
+            "Couldn't read this image automatically — please fill in the details manually."
+        ) from e
 
     draft = resp.parsed
     if not isinstance(draft, ProductDraft):
