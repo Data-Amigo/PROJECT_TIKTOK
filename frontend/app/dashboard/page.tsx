@@ -11,15 +11,38 @@
  * the thing we set up in M0 is what makes these calls work).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ingestProducts, type Product } from "@/lib/api";
+import { fetchMe, logout, type Account } from "@/lib/auth";
 import { ProductCard } from "@/components/ProductCard";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const [account, setAccount] = useState<Account | null>(null);
+  const [checking, setChecking] = useState(true); // auth check in flight
+
   const [handle, setHandle] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Gate the page on login: no valid token → bounce to /login. Runs once on mount.
+  useEffect(() => {
+    fetchMe().then((acct) => {
+      if (acct) {
+        setAccount(acct);
+        setChecking(false);
+      } else {
+        router.replace("/login");
+      }
+    });
+  }, [router]);
+
+  function signOut() {
+    logout();
+    router.replace("/login");
+  }
 
   async function ingest() {
     if (!handle.trim()) return;
@@ -44,15 +67,36 @@ export default function DashboardPage() {
     setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   }
 
+  // While the auth check runs, show nothing jarring — just a calm placeholder
+  // (prevents a flash of the dashboard before a possible redirect).
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 text-sm text-zinc-400 dark:bg-black">
+        Loading your shop…
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto min-h-screen max-w-5xl px-6 py-10">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">
-          BOB <span className="text-zinc-400">Dashboard</span>
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Paste your TikTok handle. BOB pulls your recent videos — you add price and stock.
-        </p>
+      <header className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            BOB <span className="text-zinc-400">Dashboard</span>
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Paste your TikTok handle. BOB pulls your recent videos — you add price and stock.
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{account?.name}</p>
+          <button
+            onClick={signOut}
+            className="mt-0.5 text-xs text-zinc-400 underline hover:text-zinc-600 dark:hover:text-zinc-200"
+          >
+            Log out
+          </button>
+        </div>
       </header>
 
       {/* Paste + ingest */}

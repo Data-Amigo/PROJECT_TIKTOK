@@ -11,7 +11,7 @@
 
 // Read once at module level. In the browser this string was inlined at
 // build time (NEXT_PUBLIC_); on the server it's a normal env read.
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8100";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8100";
 
 // ── Types (mirror of the pydantic *Out schemas) ────────────────────────────
 export type ProductStatus = "draft" | "published";
@@ -92,7 +92,7 @@ export async function fetchHealth(): Promise<HealthResponse | null> {
  * into one human message the UI can show — so a component never has to know
  * which shape it got.
  */
-async function throwOnError(res: Response): Promise<Response> {
+export async function throwOnError(res: Response): Promise<Response> {
   if (res.ok) return res;
   let message = `Request failed (${res.status})`;
   try {
