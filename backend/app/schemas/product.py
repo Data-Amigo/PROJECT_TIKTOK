@@ -58,10 +58,18 @@ class ProductOut(BaseModel):
 
 class AutofillOut(BaseModel):
     """Result of running the vision draft agent on one product. The product is
-    now filled with a suggested name/description; `suggested_tags` are returned
-    for display only (we don't persist them — no column, and they're a hint)."""
+    now filled with a suggested name/description. The rest are SUGGESTIONS for
+    the UI, not persisted state:
+      - suggested_price_kes: pre-fills the seller's price box if the agent read
+        a price off the image (the seller still confirms + publishes)
+      - is_product / not_product_reason: lets the UI flag non-product videos
+      - suggested_tags / language_note: display hints
+    """
 
     product: ProductOut
+    is_product: bool = True
+    not_product_reason: str = ""
+    suggested_price_kes: int | None = None
     suggested_tags: list[str] = []
     language_note: str = ""
 

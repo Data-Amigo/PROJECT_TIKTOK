@@ -166,9 +166,11 @@ def test_autofill_sets_name_and_description_only(client, db_session, monkeypatch
     db_session.flush()
 
     fake_draft = draft_mod.ProductDraft(
+        is_product=True,
         name="Fluffy Duvet Set",
         description="A soft grey duvet set.",
         tags=["duvet", "bedding"],
+        suggested_price_kes=600,   # agent read "600 ksh" off the image
         language_note="",
     )
     monkeypatch.setattr(svc, "_read_cover_bytes", lambda product: b"fake-image-bytes")
@@ -180,10 +182,39 @@ def test_autofill_sets_name_and_description_only(client, db_session, monkeypatch
     assert body["product"]["name"] == "Fluffy Duvet Set"
     assert body["product"]["description"] == "A soft grey duvet set."
     assert body["suggested_tags"] == ["duvet", "bedding"]
-    # The guardrail, at the API layer: autofill left money untouched.
+    assert body["is_product"] is True
+    # The price SUGGESTION rides back for the UI to pre-fill...
+    assert body["suggested_price_kes"] == 600
+    # ...but the GUARDRAIL holds: it was NOT written to the stored product.
+    # Only the seller's PATCH can do that.
     assert body["product"]["price_kes"] is None
     assert body["product"]["stock"] == 0
     assert body["product"]["status"] == "draft"
+
+
+def test_autofill_flags_non_product(client, db_session, monkeypatch):
+    """A reply/skit video comes back is_product=False so the inbox can flag it."""
+    seller = _make_seller(db_session, handle="skitshop")
+    p = _make_product(db_session, seller, vid="4002")
+    p.cover_url = "covers/4002.jpg"
+    db_session.flush()
+
+    fake_draft = draft_mod.ProductDraft(
+        is_product=False,
+        not_product_reason="reply video, no product shown",
+        name="Unclear — needs seller review",
+        description="",
+        tags=[],
+        suggested_price_kes=None,
+        language_note="",
+    )
+    monkeypatch.setattr(svc, "_read_cover_bytes", lambda product: b"x")
+    monkeypatch.setattr(draft_mod, "draft_from_video", lambda **kw: fake_draft)
+
+    body = client.post(f"/api/products/{p.id}/autofill").json()
+    assert body["is_product"] is False
+    assert "reply" in body["not_product_reason"]
+    assert body["suggested_price_kes"] is None
 
 
 def test_autofill_missing_product_is_404(client, monkeypatch):

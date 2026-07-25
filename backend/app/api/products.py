@@ -49,14 +49,22 @@ def ingest(body: IngestIn, db: Session = Depends(get_db)) -> list[Product]:
 
 @router.post("/{product_id}/autofill", response_model=AutofillOut)
 def autofill(product_id: int, db: Session = Depends(get_db)) -> AutofillOut:
-    """Run the vision draft agent on one product (fills name + description)."""
+    """Run the vision draft agent on one product (fills name + description;
+    returns a price suggestion + product/non-product flag for the UI)."""
     try:
-        product, tags, note = svc.autofill_product(db, product_id)
+        product, draft = svc.autofill_product(db, product_id)
     except svc.ProductError as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
     except DraftError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
-    return AutofillOut(product=ProductOut.model_validate(product), suggested_tags=tags, language_note=note)
+    return AutofillOut(
+        product=ProductOut.model_validate(product),
+        is_product=draft.is_product,
+        not_product_reason=draft.not_product_reason,
+        suggested_price_kes=draft.suggested_price_kes,
+        suggested_tags=draft.tags,
+        language_note=draft.language_note,
+    )
 
 
 @router.patch("/{product_id}", response_model=ProductOut)

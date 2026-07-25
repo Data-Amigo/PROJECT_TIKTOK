@@ -33,6 +33,9 @@ export type Product = {
 
 export type AutofillResult = {
   product: Product;
+  is_product: boolean;
+  not_product_reason: string;
+  suggested_price_kes: number | null; // pre-fills the price box; seller confirms
   suggested_tags: string[];
   language_note: string;
 };

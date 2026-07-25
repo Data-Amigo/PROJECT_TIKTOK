@@ -48,13 +48,34 @@ class DraftError(Exception):
 
 # ── OUTPUT SCHEMA (the guarantee + the guardrail) ─────────────────────────────
 class ProductDraft(BaseModel):
-    """What the agent is ALLOWED to produce. Notice what's absent: price, stock,
-    seller contact. The schema itself is the guardrail — the model literally
-    cannot return a price because there is nowhere to put one."""
+    """What the agent is ALLOWED to produce.
 
+    The guardrail EVOLVED (see CONCEPTS.md §4): the agent may now SUGGEST a
+    price — but only one it can literally SEE printed on the image ("600 ksh").
+    That suggestion only PRE-FILLS the seller's price box; it is never written
+    to the stored/published price. The seller, looking at the same picture,
+    confirms it. So the human is still the one who sets money — we just stop
+    making them retype what's on the photo. There is deliberately NO `stock`
+    field: stock is never something a picture can tell us.
+    """
+
+    is_product: bool = Field(
+        description="True if the video shows a specific physical product a shopper could buy; "
+        "false for replies, skits, announcements, or general hype with no clear item"
+    )
+    not_product_reason: str = Field(
+        default="",
+        description="If is_product is false, a short reason (e.g. 'reply video, no product shown'); else empty",
+    )
     name: str = Field(description="Short product title a shopper would recognise, e.g. 'Fluffy Duvet Set'")
     description: str = Field(description="1-2 plain sentences describing the item, in English")
     tags: list[str] = Field(description="3-6 lowercase category keywords, e.g. ['duvet', 'bedding']")
+    suggested_price_kes: int | None = Field(
+        default=None,
+        description="Whole Kenyan shillings, ONLY if a price is clearly printed on the image or "
+        "stated in the caption (e.g. '600 ksh', 'KES 800', 'bei 500', '600/='). If no price is "
+        "clearly shown, null. NEVER guess, estimate, or invent a price.",
+    )
     language_note: str = Field(
         default="",
         description="If the caption/image text was Swahili or Sheng, the key phrase you translated; else empty",
@@ -73,9 +94,17 @@ are mostly hashtags and are rarely useful. The COVER IMAGE is your main source �
 read any text printed on it, including Swahili and Sheng, and identify the product.
 
 Rules:
+- First decide is_product: does this video show a specific physical item a shopper \
+could buy? Reply/duet/skit/announcement videos, or general hype with no clear \
+product, are is_product=false with a short not_product_reason. When false, still \
+fill your best-guess name/description from whatever is visible.
 - Describe only what you can actually see or read. Do not invent details.
-- NEVER state or guess a price, phone number, or stock quantity. Those are the \
-seller's to set, not yours.
+- PRICE: sellers often print the price right on the cover ("clogs 600 ksh", \
+"650 ksh", "KES 800", "bei 500", "600/="). If you can clearly READ a price for \
+this product, put the whole-shilling number in suggested_price_kes. If no price \
+is clearly shown, leave it null. NEVER guess or estimate a price — a wrong \
+suggested price is worse than none.
+- NEVER output a phone number or a stock quantity. Those are the seller's alone.
 - Keep the name short and the description to one or two plain English sentences.
 - If you genuinely cannot tell what the product is, say so in the name \
 ("Unclear — needs seller review") rather than guessing."""
@@ -159,8 +188,10 @@ if __name__ == "__main__":
         caption="#kenyantiktok #duvets #fypp",
         hashtags=["kenyantiktok", "duvets", "fypp"],
     )
+    print(f"  is_product:  {d.is_product}" + (f" — {d.not_product_reason}" if not d.is_product else ""))
     print(f"  name:        {d.name}")
     print(f"  description: {d.description}")
     print(f"  tags:        {d.tags}")
+    print(f"  price seen:  {('KES ' + str(d.suggested_price_kes)) if d.suggested_price_kes else '(none printed)'}")
     print(f"  language:    {d.language_note or '(none)'}")
-    print("\nNEXT STEP: the seller confirms this draft and adds price + stock (M1.3 API).")
+    print("\nNEXT STEP: the seller confirms this draft (price pre-filled if seen) and publishes.")

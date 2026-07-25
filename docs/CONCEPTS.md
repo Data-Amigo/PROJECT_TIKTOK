@@ -98,18 +98,30 @@ separates a toy from something a stranger can trust with a payment.
 Concretely, in `draft.py`:
 
 - The `ProductDraft` schema has fields for `name`, `description`, `tags`.
-- It has **no field for price and no field for stock.** By *construction* the model
-  cannot set them — there's nowhere for a price to go.
-- A test (`test_draft_schema_has_no_money_fields`) asserts this can never regress.
+- It has **no field for stock, and no field the service ever writes to the stored
+  price.** The seller's `PATCH` is the *only* writer of `Product.price_kes`.
+- Tests assert this can never regress: `test_draft_never_exposes_stock_or_contact`
+  (schema) and `test_autofill_sets_name_and_description_only` (the service leaves
+  the stored price untouched even when the agent suggested one).
 
-So even if the model misreads *"bei ni 800"* as *400*, it cannot publish a wrong
-price — the number simply has no path into the system. The seller sets money with
-one tap; deterministic Python and a database constraint own the truth.
+**A refinement we made after real sellers hit it (2026-07-25).** Sellers often print
+the price right on the cover — *"clogs 600 ksh"*. Making them retype that was silly,
+so the agent now READS it and returns `suggested_price_kes`. But notice the guardrail
+didn't weaken, it got *more precise*: the suggestion only **pre-fills the seller's
+price box** (highlighted "read from image — confirm it"); it is never written to the
+stored/published price. The seller, looking at the same photo, confirms it. So the
+human is still the one who sets money — we just stopped making them copy what's on the
+picture. The rule is now: **the agent may SUGGEST a price it can SEE; only the seller
+can SET one.** If the model misreads *800* as *400*, the seller catches it at the
+confirm step — the misread never reaches `Product.price_kes` on its own.
 
-Generalize it: **the LLM talks; code transacts.** The agent drafts words, suggests
-timings, answers questions. Prices, stock decrements, payment status, consent — all
-decided by plain code with hard rules. This is why an "agentic system" is ~20% LLM
-calls and ~80% deterministic rails. We build the rails on purpose.
+Generalize it: **the LLM talks; code transacts.** The agent drafts words, suggests a
+price it can read, flags non-products, later answers buyer questions and *proposes* an
+STK push. Prices, stock decrements, payment status, consent — all decided by plain
+code with hard rules. This is why an "agentic system" is ~20% LLM calls and ~80%
+deterministic rails. We build the rails on purpose — and it's exactly why, when we
+build the agentic checkout, the M-Pesa payment path gets built and tested *before* the
+agent is ever allowed to call it.
 
 ---
 
