@@ -221,3 +221,18 @@ def test_autofill_missing_product_is_404(client, monkeypatch):
     monkeypatch.setattr(svc, "_read_cover_bytes", lambda product: b"x")
     r = client.post("/api/products/999999/autofill")
     assert r.status_code == 404
+
+
+def test_autofill_quota_exceeded_returns_429(client, db_session, monkeypatch):
+    """A Gemini daily-cap (429) surfaces as 429 with a seller-friendly message,
+    not a 500 or a wall of Google JSON."""
+    seller = _make_seller(db_session, handle="quotashop")
+    p = _make_product(db_session, seller, vid="4003")
+
+    def _raise_quota(db, pid):
+        raise draft_mod.DraftQuotaError("The image reader has reached today's usage limit.")
+
+    monkeypatch.setattr(svc, "autofill_product", _raise_quota)
+    r = client.post(f"/api/products/{p.id}/autofill")
+    assert r.status_code == 429
+    assert "limit" in r.json()["detail"].lower()
