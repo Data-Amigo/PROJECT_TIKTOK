@@ -48,7 +48,7 @@ def ingest_seller_videos(db: Session, handle: str, limit: int = 6) -> list[Produ
     seller = db.scalar(select(Seller).where(Seller.tiktok_username == author.name))
     if seller is None:
         seller = Seller(
-            handle=author.name,                 # bob.link/<handle>; seller can rename later
+            handle=author.name,                 # sokolink/<handle>; seller can rename later
             display_name=author.nickName or author.name,
             tiktok_username=author.name,
             bio=author.signature,               # raw bio — holds addresses/phones (spike 00)
@@ -164,7 +164,7 @@ def update_product(db: Session, product_id: int, changes: ProductUpdateIn) -> Pr
 
 # ── Public page: seller + their live, available products ──────────────────────
 def get_public_page(db: Session, handle: str) -> Seller:
-    """Load a seller by public handle for bob.link/<handle>.
+    """Load a seller by public handle for sokolink/<handle>.
 
     Returns the Seller; the caller reads seller.products and filters to
     published+available for the public shape. Raises ProductError (→ 404) when

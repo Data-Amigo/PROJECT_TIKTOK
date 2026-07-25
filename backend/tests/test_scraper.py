@@ -54,7 +54,7 @@ def test_missing_cover_is_tolerated():
 
 
 def test_garbage_is_rejected_at_the_border():
-    """An item without the fields BOB depends on must fail HERE — loudly —
+    """An item without the fields SokoLink depends on must fail HERE — loudly —
     not three layers deeper as a mystery AttributeError."""
     with pytest.raises(ValidationError):
         TikTokVideo.model_validate({"something": "else entirely"})

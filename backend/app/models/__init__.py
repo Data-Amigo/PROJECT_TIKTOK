@@ -1,5 +1,5 @@
 """
-Models package — every table BOB owns, one file per aggregate.
+Models package — every table SokoLink owns, one file per aggregate.
 
     Base (app/db.py)
       ├── Seller   (seller.py)   who sells: handle, bio, contacts

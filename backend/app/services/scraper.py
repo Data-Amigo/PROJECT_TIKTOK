@@ -66,7 +66,7 @@ class _VideoMeta(BaseModel):
 
 
 class TikTokVideo(BaseModel):
-    """One scraped video, validated. This is what the rest of BOB consumes."""
+    """One scraped video, validated. This is what the rest of SokoLink consumes."""
 
     id: str                                # TikTok's video id → products.tiktok_video_id
     text: str = ""                         # caption (hashtag soup, per spike 00)

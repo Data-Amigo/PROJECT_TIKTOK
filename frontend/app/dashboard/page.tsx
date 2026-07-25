@@ -82,10 +82,10 @@ export default function DashboardPage() {
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            BOB <span className="text-zinc-400">Dashboard</span>
+            SokoLink <span className="text-zinc-400">Dashboard</span>
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Paste your TikTok handle. BOB pulls your recent videos — you add price and stock.
+            Paste your TikTok handle. SokoLink pulls your recent videos — you add price and stock.
           </p>
         </div>
         <div className="shrink-0 text-right">

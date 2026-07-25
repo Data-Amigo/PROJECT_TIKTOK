@@ -1,5 +1,5 @@
 /**
- * Public BOB Page — bob.link/<handle>. The shopfront real customers see.
+ * Public SokoLink Page — sokolink/<handle>. The shopfront real customers see.
  *
  * SERVER COMPONENT: the whole page is rendered to HTML on the server and sent
  * ready-to-paint. On a mid-range Kenyan phone over patchy data this is the
@@ -22,7 +22,7 @@ import { notFound } from "next/navigation";
 import { coverSrc, fetchPublicPage, SHOP_NOT_FOUND } from "@/lib/api";
 import { PublicProductCard } from "@/components/PublicProductCard";
 
-// bob.link/<handle> — Next 16 hands params as a Promise.
+// sokolink/<handle> — Next 16 hands params as a Promise.
 type Params = Promise<{ handle: string }>;
 
 // React cache() dedupes within one request: generateMetadata and the page both
@@ -37,16 +37,16 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   try {
     shop = await loadShop(handle);
   } catch {
-    return { title: "BOB" }; // backend hiccup: don't block, just a plain title
+    return { title: "SokoLink" }; // backend hiccup: don't block, just a plain title
   }
-  if (shop === SHOP_NOT_FOUND) return { title: "Shop not found · BOB" };
+  if (shop === SHOP_NOT_FOUND) return { title: "Shop not found · SokoLink" };
 
   // Preview image: the first product cover, else the seller's avatar.
   const previewImage =
     coverSrc(shop.products.find((p) => p.cover_url)?.cover_url ?? null) ??
     coverSrc(shop.avatar_url);
 
-  const title = `${shop.display_name} · BOB`;
+  const title = `${shop.display_name} · SokoLink`;
   const description = `Shop ${shop.display_name}'s latest drops. Pay with M-Pesa.`;
 
   return {
@@ -116,8 +116,8 @@ export default async function BobPage({ params }: { params: Params }) {
         {/* Trust footer */}
         <footer className="mt-12 border-t border-zinc-200 pt-6 text-center dark:border-zinc-800">
           <p className="text-xs text-zinc-400">
-            Powered by <span className="font-semibold text-zinc-600 dark:text-zinc-300">BOB</span>{" "}
-            · Post once, sell everywhere
+            Powered by <span className="font-semibold text-zinc-600 dark:text-zinc-300">SokoLink</span>{" "}
+            · Where your audience becomes your customers
           </p>
         </footer>
       </main>

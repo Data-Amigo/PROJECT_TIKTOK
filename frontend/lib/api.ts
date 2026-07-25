@@ -149,7 +149,7 @@ export async function updateProduct(id: number, changes: ProductUpdate): Promise
 export const SHOP_NOT_FOUND = Symbol("shop-not-found");
 
 /**
- * Fetch a public shop by handle, for bob.link/<handle>.
+ * Fetch a public shop by handle, for sokolink/<handle>.
  *
  * `cache: "no-store"` — availability changes with every sale, so the page must
  * read live stock, never a stale snapshot. A customer seeing "Available" on a

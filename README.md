@@ -1,10 +1,13 @@
-# Project TIKTOK — BOB for Commerce
+# SokoLink
 
-An AI agent that turns a TikTok/Instagram post into a complete sale — **post once, sell everywhere.**
+> **Where your audience becomes your customers.**
+
+An AI-powered social-commerce platform that turns a TikTok seller's content into a
+real shop — post on TikTok, and your audience buys from your SokoLink page.
 
 > **Scope:** Commerce only. Insurance is a separate, later effort.
 > **v1 is web-first:** no WhatsApp yet (too easily blocked, and we're skipping the Meta
-> application for now). The customer orders on a web page and pays with M-Pesa; BOB
+> application for now). The customer orders on a web page and pays with M-Pesa; SokoLink
 > follows up by SMS. WhatsApp is a later upgrade using the same consented contact list.
 
 **Stack:** FastAPI (Python) backend · Next.js frontend · **M-Pesa Daraja** (payments) · **Africa's Talking** (SMS).
@@ -15,7 +18,7 @@ An AI agent that turns a TikTok/Instagram post into a complete sale — **post o
 
 ```
 Discover        Browse            Order + contact        Pay              Fulfil + confirm
-TikTok/IG   →   BOB Page shows →  on-page form:      →   STK push to  →   seller sees order,
+TikTok/IG   →   SokoLink Page shows →  on-page form:      →   STK push to  →   seller sees order,
 post,           today's drop      name · phone ·         that phone,      buyer gets SMS
 tap the link    + availability    delivery · consent     Daraja = truth   + rider details
 ```
@@ -33,9 +36,9 @@ Payment and contact capture are one step. Every order becomes a clean row:
 
 | Piece | v1 (web-first) |
 |-------|----------------|
-| **BOB Page** | AI link-in-bio. Seller pastes a TikTok/IG link → BOB pulls video, caption, thumbnail → seller adds price + stock. Buyers see today's drop with live availability. |
-| **BOB Checkout** | On-page order form captures name, phone, delivery + consent, then fires the M-Pesa STK push. Replaces the WhatsApp close. |
-| **BOB Reach** | Consent-based **SMS** marketing. Opt-in at checkout, paced restock broadcasts, STOP handling. |
+| **SokoLink Page** | AI link-in-bio. Seller pastes a TikTok/IG link → SokoLink pulls video, caption, thumbnail → seller adds price + stock. Buyers see today's drop with live availability. |
+| **SokoLink Checkout** | On-page order form captures name, phone, delivery + consent, then fires the M-Pesa STK push. Replaces the WhatsApp close. |
+| **SokoLink Reach** | Consent-based **SMS** marketing. Opt-in at checkout, paced restock broadcasts, STOP handling. |
 
 ---
 
@@ -43,9 +46,9 @@ Payment and contact capture are one step. Every order becomes a clean row:
 
 ```
 Project TIKTOK/
-├─ frontend/          Next.js — the BOB Page + seller dashboard + checkout form
+├─ frontend/          Next.js — the SokoLink Page + seller dashboard + checkout form
 │  ├─ app/
-│  │  ├─ [handle]/    public page: bob.link/mama-wanjiku
+│  │  ├─ [handle]/    public page: sokolink/mama-wanjiku
 │  │  ├─ dashboard/   seller: paste link, set price & stock, see orders
 │  │  └─ api/         light routes that call the backend
 │  ├─ components/     reusable UI (product card, order form, order button)
@@ -75,11 +78,11 @@ Project TIKTOK/
 | # | Goal | Done when |
 |---|------|-----------|
 | **M0** | Foundation | All services boot; `/health` returns 200 |
-| **M1** | BOB Page | Seller makes a page; public link shows item, price, availability |
+| **M1** | SokoLink Page | Seller makes a page; public link shows item, price, availability |
 | **M2** | Checkout + contact | Submitting the order form creates an order row with the customer's phone captured |
 | **M3** | M-Pesa close | Sandbox STK payment completes; order paid; stock auto-updates |
 | **M4** | Fulfilment + SMS | Seller sees a packed-order card; buyer gets an SMS confirmation + rider details |
-| **M5** | BOB Reach (SMS) | Opted-in buyer gets a restock SMS; STOP removes them |
+| **M5** | SokoLink Reach (SMS) | Opted-in buyer gets a restock SMS; STOP removes them |
 | **M6** | Pilot-ready | Live on real credentials; a real seller runs one full order end to end |
 
 See `docs/` for the full technical flow.
@@ -108,5 +111,5 @@ vs extraction; the model proposes a clip, code decides if it's allowed).
 - [x] Folder skeleton
 - [x] Plan set to web-first
 - [x] M0 — Foundation (all services boot, `/health` green)
-- [x] M1 — BOB Page (seller pastes handle → drafts → price/publish → public `bob.link/<handle>` with live availability)
+- [x] M1 — SokoLink Page (seller pastes handle → drafts → price/publish → public `sokolink/<handle>` with live availability)
 - [ ] M2 — Checkout + contact capture (next)

@@ -42,13 +42,13 @@ class Settings(BaseSettings):
     )
 
     # ── App identity ──
-    app_name: str = "BOB for Commerce"
+    app_name: str = "SokoLink"
     app_env: str = "dev"             # dev | staging | prod — gates docs page etc.
 
     # ── CORS ──
     # Which BROWSER origins may call this API (server-to-server calls ignore
     # CORS entirely — it's a browser rule). Comma-separated so prod can add
-    # the real domain via env: "https://bob.link,https://www.bob.link".
+    # the real domain via env: "https://sokolink,https://www.sokolink".
     # NEVER "*": a wildcard would let any website on the internet script
     # requests against our API from its visitors' browsers.
     cors_origins: str = "http://localhost:3000"
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
 
     # REQUIRED (no default): the app refuses to boot without a database.
-    # Points at BOB's OWN Railway Postgres — never a shared one. We learned
+    # Points at SokoLink's OWN Railway Postgres — never a shared one. We learned
     # this the concrete way: the first URL we tried held 28 tables from two
     # other projects, including a `products` table our migrations could have
     # mangled. One database per application, always.

@@ -21,7 +21,7 @@ class Seller(Base):
     # is `handle` below. Never leak DB ids into URLs.
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    # The bob.link/<handle> slug. Unique + indexed because the public page
+    # The sokolink/<handle> slug. Unique + indexed because the public page
     # looks sellers up by it on every single view.
     handle: Mapped[str] = mapped_column(String(50), unique=True, index=True)
 
@@ -29,7 +29,7 @@ class Seller(Base):
     display_name: Mapped[str] = mapped_column(String(100))
 
     # Their TikTok username (authorMeta.name in the Apify payload). Unique:
-    # one BOB seller per TikTok account — a second registration is a mistake
+    # one SokoLink seller per TikTok account — a second registration is a mistake
     # or an impersonation, and the DB should refuse both. Nullable because a
     # seller can be created before their TikTok is connected.
     tiktok_username: Mapped[str | None] = mapped_column(

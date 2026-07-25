@@ -10,7 +10,7 @@
 
 import { API_URL, throwOnError } from "@/lib/api";
 
-const TOKEN_KEY = "bob_token";
+const TOKEN_KEY = "sokolink_token";
 
 export type Account = {
   id: number;

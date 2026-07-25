@@ -4,7 +4,7 @@ Products + Pages HTTP routes.
     /api/products/ingest        POST   scrape a handle → DRAFT products
     /api/products/{id}/autofill POST   run the 🤖 vision agent on one product
     /api/products/{id}          PATCH  seller sets words/price/stock, publishes
-    /api/pages/{handle}         GET    public bob.link/<handle> data (buyers)
+    /api/pages/{handle}         GET    public sokolink/<handle> data (buyers)
 
 Routes are thin: call a service, map its exceptions to HTTP. All the meaning
 lives in services/products.py.
@@ -85,7 +85,7 @@ def update(product_id: int, body: ProductUpdateIn, db: Session = Depends(get_db)
 # ── Buyer-facing ──────────────────────────────────────────────────────────────
 @pages_router.get("/{handle}", response_model=PublicPageOut)
 def public_page(handle: str, db: Session = Depends(get_db)) -> PublicPageOut:
-    """The whole public shop page for bob.link/<handle>."""
+    """The whole public shop page for sokolink/<handle>."""
     try:
         seller = svc.get_public_page(db, handle)
     except svc.ProductError as e:

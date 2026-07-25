@@ -1,5 +1,5 @@
 /**
- * 404 for bob.link/<handle> when no such shop exists. A real not-found page
+ * 404 for sokolink/<handle> when no such shop exists. A real not-found page
  * (Next serves it with HTTP 404), not a broken-looking empty shop — a customer
  * who mistypes a link gets a clear, calm answer.
  */

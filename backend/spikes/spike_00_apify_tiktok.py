@@ -109,7 +109,7 @@ def download_thumbnail(url: str, dest: Path) -> None:
     """Download a cover image to disk.
 
     THE #1 GOTCHA of this whole data source: TikTok cover URLs are signed CDN
-    links that EXPIRE (hours, not days). Hotlink them and every BOB Page goes
+    links that EXPIRE (hours, not days). Hotlink them and every SokoLink Page goes
     blank by tomorrow. So the rule is: scrape -> download -> store OUR copy.
     This function is the proof that works.
     """

@@ -3,7 +3,7 @@ Model tests — prove the data spine's claims, especially the DB-level rails.
 
 Philosophy: we don't test that SQLAlchemy works (it does); we test OUR
 rules — constraints, derived availability, the idempotency rail — because
-those are the claims the rest of BOB will lean on.
+those are the claims the rest of SokoLink will lean on.
 """
 
 import pytest

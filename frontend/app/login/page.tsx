@@ -32,7 +32,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-bold tracking-tight">
-          Welcome back to <span className="text-zinc-400">BOB</span>
+          Welcome back to <span className="text-zinc-400">SokoLink</span>
         </h1>
         <p className="mt-1 text-sm text-zinc-500">Log in to manage your shop.</p>
 
