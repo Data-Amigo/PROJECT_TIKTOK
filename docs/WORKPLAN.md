@@ -226,9 +226,12 @@ price, Available badge).
 
 *Goal: a seller signs up, connects TikTok once, and owns a storefront.*
 
-- [ ] **2.1 Auth** — `Account` model + sign up (name/phone/email/password) + login
-      (hashed passwords, session/JWT). Dashboard sits behind login.
-      *You learn:* password hashing, auth as a boundary, sessions vs tokens.
+- [x] **2.1 Auth** — `Account` model (email/phone unique) + Argon2id hashing +
+      signed JWT (SECRET_KEY required). Routes: signup/login/me (anti-enumeration,
+      hash never leaked, 422 border validation). Frontend: /signup + /login,
+      token in lib/auth.ts, dashboard gated. 34 tests; 66 green. Live-verified. (#14)
+      *You learned:* Argon2id, JWT auth, DB uniqueness, anti-enumeration,
+      border validation, gating a Next.js page.
 - [ ] **2.2 Connect TikTok** — store the seller's TikTok username on the account;
       on connect, auto-fill their storefront profile (display name, avatar, bio,
       followers) from the scraped `authorMeta`. (Username now; true OAuth later.)
@@ -355,3 +358,5 @@ first on purpose.
 | 2026-07-25 | M1.5 Public BOB Page — server-rendered bob.link/<handle>, OG previews, 404+error boundaries, mobile-first, honest checkout-coming CTA. Screenshotted live. **M1 done-when met** → merge to main (#13) |
 | 2026-07-25 | **Roadmap pivot** (seller feedback): account-first shop ending in an on-page **agentic checkout** (WhatsApp close relocated to web; M-Pesa thesis kept). Milestones re-sequenced M2 accounts → M3 inbox → M4 M-Pesa rails → M5 agent checkout → M6 seller chat → M7 reach+pilot |
 | 2026-07-25 | M1.6 Smart drafting — agent reads printed price (suggested_price_kes, pre-fills box, seller confirms) + product/non-product flag. Fixes real complaint. Live: clog covers → KES 600/650/900 read correctly. Guardrail refined in CONCEPTS §4. 35 tests green |
+| 2026-07-25 | Hotfix: friendly 429 when Gemini free-tier daily cap (20/day) hits — seller-safe message, not raw JSON. Guidance: enable Gemini billing for customer testing |
+| 2026-07-25 | M2.1 Seller accounts — Argon2id + JWT auth (signup/login/me), Kenyan phone normalization, browser sign-in (signup/login pages, gated dashboard). 34 tests, 66 green, live-verified (#14). SECRET_KEY added to .env |
