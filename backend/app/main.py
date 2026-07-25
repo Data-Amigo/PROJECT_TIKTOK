@@ -14,10 +14,13 @@ file in here grows past ~100 lines, something is in the wrong place.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from app.api import products as products_api
 from app.config import settings
 from app.db import engine
+from app.services.scraper import MEDIA_DIR
 
 # ── APP ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -41,6 +44,22 @@ app.add_middleware(
     allow_methods=["*"],   # fine to be broad once the ORIGIN is locked down
     allow_headers=["*"],
 )
+
+# ── STATIC MEDIA ──────────────────────────────────────────────────────────────
+# Serve OUR stored cover images at /media/covers/<id>.jpg so the browser can
+# show them (cover_url in the API is "covers/<id>.jpg", relative to this root).
+# mkdir first: StaticFiles refuses to mount a missing directory at startup, and
+# on a fresh clone nothing's been scraped yet. This is the POC's file server;
+# in prod the same paths move behind object storage + a CDN — the API's
+# relative cover_url values don't change, only this mount does.
+MEDIA_ROOT = MEDIA_DIR.parent
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
+
+# ── ROUTERS ───────────────────────────────────────────────────────────────────
+# Each resource area is its own router in api/; main just registers them.
+app.include_router(products_api.router)        # /api/products/*  (seller)
+app.include_router(products_api.pages_router)  # /api/pages/*     (buyer)
 
 
 # ── HEALTH ────────────────────────────────────────────────────────────────────

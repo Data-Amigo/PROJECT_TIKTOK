@@ -29,6 +29,9 @@ openwa/data/
 # --- Spike output (scraped media / raw dumps never go in git) ---
 backend/spikes/out/
 
+# --- Media store (our copies of scraped covers/avatars — not code) ---
+backend/media/
+
 # --- Databases / local data ---
 *.sqlite
 *.sqlite3
