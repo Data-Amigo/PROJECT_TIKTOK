@@ -85,6 +85,20 @@ class Settings(BaseSettings):
         Railway gave it (easy to re-paste on rotation)."""
         return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
+    # ── Auth (JWT) ──
+    # REQUIRED (no default): signs every login token. A hard-coded fallback
+    # here would mean anyone reading the repo can forge a valid login — so we
+    # refuse to boot without a real secret from .env. Generate one with:
+    #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+    secret_key: str
+
+    jwt_algorithm: str = "HS256"  # symmetric HMAC — one secret signs and verifies
+
+    # 7 days. Long enough that pilot sellers aren't re-logging-in constantly;
+    # short enough that a leaked token isn't valid forever. (Refresh tokens are
+    # a later hardening step; noted in the workplan.)
+    access_token_expire_minutes: int = 60 * 24 * 7
+
 
 # The one instance the whole app shares. Import THIS, never instantiate again —
 # re-instantiating would re-read .env and could disagree mid-flight.
