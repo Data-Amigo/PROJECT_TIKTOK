@@ -12,17 +12,27 @@ import pytest
 from app.agent.draft import DraftError, ProductDraft, draft_from_video
 
 
-def test_draft_schema_has_no_money_fields():
-    """The core safety property, asserted as a test so it can never regress:
-    the agent's output schema cannot carry a price or stock. If someone adds
-    one later, this test fails and forces the conversation."""
-    forbidden = {"price", "amount", "cost", "stock", "quantity", "qty", "phone"}
+def test_draft_never_exposes_stock_or_contact():
+    """The guardrail, asserted so it can't silently regress. The agent may now
+    SUGGEST a price it can READ off the image (suggested_price_kes) — but it
+    must never carry stock or a phone. Stock isn't visible in a picture; a
+    contact is the seller's alone. (That the suggested price never becomes the
+    STORED price is proven at the service layer — see test_products.py.)"""
+    forbidden = {"stock", "quantity", "qty", "phone", "contact"}
     fields = set(ProductDraft.model_fields)
-    assert fields & forbidden == set(), f"draft must not expose money/stock: {fields & forbidden}"
+    assert fields & forbidden == set(), f"draft must not expose stock/contact: {fields & forbidden}"
 
 
-def test_draft_only_exposes_descriptive_fields():
-    assert set(ProductDraft.model_fields) == {"name", "description", "tags", "language_note"}
+def test_draft_exposes_expected_fields():
+    assert set(ProductDraft.model_fields) == {
+        "is_product",
+        "not_product_reason",
+        "name",
+        "description",
+        "tags",
+        "suggested_price_kes",
+        "language_note",
+    }
 
 
 def test_no_cover_raises_clean_error():

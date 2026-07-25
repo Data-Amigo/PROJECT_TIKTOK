@@ -196,101 +196,129 @@ price, Available badge).
 
 ---
 
-## M2 — Checkout + contact capture  `branch: m2-checkout`
+> **⤳ Roadmap pivot (2026-07-25).** After M1, the model changed from
+> "paste a handle each time" to an **account-first shop** ending in an
+> **on-page agentic checkout**. Why: pasting a handle every time is too much
+> seller work, and WhatsApp's agentic close is blocked by Meta — so we build
+> the close *natively on the BOB page* (the original deck's "BOB Agent",
+> relocated to the web where nobody can block it). The M-Pesa thesis is
+> preserved: the agent collects the phone to send the STK, and that phone *is*
+> the contact. Everything M1 built is reused — it just moves behind a login and
+> a Content Inbox. Rails-before-agent still rules: the payment path is built
+> and tested before the agent may call it.
 
-*Goal: submitting the order form creates an order row with the phone captured.*
+## M1.6 — Smart drafting  `branch: smart-drafting`  *(done)*
 
-- [ ] **2.1 Models** — `Order` (name·phone·item·amount·status·time) and `Consent`
-      tables + migration. Order status is a small state machine:
-      `pending → paid → packed → delivered` (+ `failed`).
-      *You learn:* modelling a state machine in a DB; why status transitions are
-      code, not vibes.
-- [ ] **2.2 Orders API** — create order, list orders for seller, validate phone
-      (Kenyan format 2547XXXXXXXX), consent checkbox captured explicitly.
-      *You learn:* input validation as a security boundary; consent as data.
-- [ ] **2.3 Checkout UI** — on-page order form (name, phone, delivery, consent),
-      optimistic UX, error states.
-      *You learn:* forms that fail gracefully; why the phone field is the
-      whole business model (payment = contact capture).
+*Interleaved before M2 to fix real-seller pain immediately.*
 
-**Done when:** submitting the form creates an order row you can see in the
-dashboard, with phone + consent recorded.
-
----
-
-## M3 — M-Pesa close  `branch: m3-mpesa`
-
-*Goal: sandbox STK payment completes; order paid; stock auto-updates.*
-
-- [ ] **3.1 Daraja client** — `services/mpesa.py`: OAuth token, STK push, query.
-      Sandbox credentials in `.env`.
-      *You learn:* OAuth client-credentials flow, signing requests, sandbox vs prod.
-- [ ] **3.2 Callback webhook** — `api/daraja.py`: receive the callback, verify,
-      **idempotency via Redis** (Daraja can retry — we must not double-fulfil).
-      *You learn:* webhooks, idempotency keys, why "callback = payment truth".
-- [ ] **3.3 Order flow wiring** — checkout submit → STK push to buyer's phone →
-      callback flips order `pending → paid` → stock decrements → page shows SOLD.
-      *You learn:* an end-to-end async flow across four systems.
-- [ ] **3.4 Tunnel + live sandbox test** — ngrok/cloudflared so Daraja can reach
-      localhost; full test with a sandbox number.
-      *You learn:* exposing localhost safely, reading Daraja's (weird) callback JSON.
-
-**Done when:** a sandbox payment completes end to end and the public page flips
-to SOLD without anyone touching the DB.
+- [x] **1.6 Price-from-image + product detection** — the draft agent now reads a
+      price printed on the cover (`suggested_price_kes`) and flags product vs
+      non-product (`is_product`). Guardrail *refined not weakened*: the suggestion
+      only PRE-FILLS the seller's price box ("read from image — confirm it"); the
+      stored price is still written solely by the seller's PATCH (CONCEPTS §4).
+      Proven live: real clog covers → KES 600/650/900 read correctly. 35 green.
+      *You learned:* evolving a guardrail precisely, structured output with
+      optional fields, human-confirms-what-the-model-sees.
 
 ---
 
-## M4 — Fulfilment + SMS confirm  `branch: m4-fulfilment`
+## M2 — Seller accounts + storefront  `branch: m2-accounts`
 
-*Goal: seller sees packed-order card; buyer gets SMS confirmation + rider details.*
+*Goal: a seller signs up, connects TikTok once, and owns a storefront.*
 
-- [ ] **4.1 SMS service** — `services/sms.py`: Africa's Talking client behind our
-      own interface (so WhatsApp can swap in later without touching callers).
-      *You learn:* the adapter pattern — the single most important design habit
-      in this repo.
-- [ ] **4.2 Buyer confirmation** — on `paid`, send SMS receipt; on `packed`,
-      send rider details. Every send is audit-logged.
-      *You learn:* event-driven side effects, audit trails.
-- [ ] **4.3 Seller fulfilment UI** — packed-order card in dashboard; mark packed /
-      delivered; status history visible.
-      *You learn:* driving the state machine from the UI.
+- [ ] **2.1 Auth** — `Account` model + sign up (name/phone/email/password) + login
+      (hashed passwords, session/JWT). Dashboard sits behind login.
+      *You learn:* password hashing, auth as a boundary, sessions vs tokens.
+- [ ] **2.2 Connect TikTok** — store the seller's TikTok username on the account;
+      on connect, auto-fill their storefront profile (display name, avatar, bio,
+      followers) from the scraped `authorMeta`. (Username now; true OAuth later.)
+      *You learn:* reusing the scraper behind an account; profile hydration.
+- [ ] **2.3 Storefront ownership** — the public `/[handle]` page belongs to the
+      account; the seller's phone (for M-Pesa) lives on the account.
+      *You learn:* tying public identity (handle) to a private account.
 
-**Done when:** after a sandbox payment, the seller gets a packed card and the
-buyer's phone gets a real SMS with rider details.
-
----
-
-## M5 — BOB Reach  `branch: m5-reach`
-
-*Goal: opted-in buyer gets a restock SMS; STOP removes them.*
-
-- [ ] **5.1 Consent registry + STOP** — inbound SMS webhook; STOP instantly flips
-      consent off; audit-logged.
-      *You learn:* compliance as a feature; two-way SMS.
-- [ ] **5.2 Broadcast worker** — Redis-backed queue; paced sends with jittered
-      delays and rate limits; dry-run mode first.
-      *You learn:* background workers, pacing/backoff — the ops side of agents.
-- [ ] **5.3 🤖 Reach agent** — the LLM drafts the restock message per product
-      (seller approves), and timing logic decides *when* to send (not 2am).
-      Guardrails: opt-in only, caps per day, STOP always wins.
-      *You learn:* agent guardrails, human-in-the-loop approval, why the agent
-      proposes and code disposes.
-
-**Done when:** an opted-in test number receives a restock SMS from a broadcast;
-replying STOP removes it and the next broadcast skips it.
+**Done when:** a seller creates an account, connects their TikTok, and their
+`/[handle]` storefront shows their auto-filled profile.
 
 ---
 
-## M6 — Pilot-ready  `branch: m6-pilot`
+## M3 — Content Inbox + auto-drafting  `branch: m3-inbox`
 
-*Goal: live on real credentials; a real seller runs one full order end to end.*
+*Goal: new TikTok content surfaces automatically as draft products to confirm.*
 
-- [ ] **6.1 Seller auth** — login for the dashboard (simple, boring, safe).
-- [ ] **6.2 Hardening** — error handling, request logging, rate limits on public
-      endpoints, secrets audit.
-- [ ] **6.3 Deploy** — frontend to Vercel; backend + Postgres + Redis to a VPS;
-      real Daraja + Africa's Talking credentials.
-- [ ] **6.4 Pilot** — one real seller, one real order, end to end. Watch the logs.
+- [ ] **3.1 Inbox model + sync** — background/periodic scrape of the connected
+      account into a Content Inbox; the manual paste box moves behind the scenes.
+      *You learn:* scheduled jobs, dedupe/idempotency at scale, cost pacing.
+- [ ] **3.2 🤖 Auto-detect + suggest** — run the (M1.6) agent on inbox items:
+      products get name/description + price suggestion; non-products get flagged
+      and filtered. Seller confirms price + stock → publish.
+      *You learn:* human-in-the-loop triage, batching agent calls under a cap.
+
+**Done when:** connecting an account fills an inbox; the seller confirms a couple
+of items into published products without ever pasting a URL.
+
+---
+
+## M4 — Payment rails (M-Pesa)  `branch: m4-mpesa`  *(the "code transacts" layer)*
+
+*Goal: an STK payment completes and marks an order paid — driven by plain code,
+proven BEFORE any agent can call it.*
+
+- [ ] **4.1 Order + Consent models** — state machine `pending → paid → …`; phone
+      captured in Kenyan format; consent as explicit data.
+- [ ] **4.2 Daraja client** — `services/mpesa.py`: OAuth, STK push, query.
+- [ ] **4.3 Callback webhook** — `api/daraja.py`: verify, **idempotent** (Daraja
+      retries), callback = payment truth → order `paid` → stock decrements.
+- [ ] **4.4 Tunnel + sandbox test** — trigger STK with a plain button first; prove
+      the whole path end to end with a sandbox number.
+      *You learn:* OAuth flow, webhooks, idempotency, "callback = truth" — and why
+      we build this rail fully before the agent is allowed near it.
+
+**Done when:** a sandbox STK payment (triggered by a button, no agent yet)
+completes and flips an order to paid + stock to SOLD, hands-off.
+
+---
+
+## M5 — 🤖 Agentic checkout chat  `branch: m5-agent-checkout`  *(the crown jewel)*
+
+*Goal: a buyer chats on the BOB page; the agent answers, collects the phone,
+fires the STK, they pay — all on-page (the WhatsApp close, minus Meta).*
+
+- [ ] **5.1 Chat agent (Claude) + tools** — on-page chat; the agent answers
+      product questions from the DB (direct lookup, not RAG) and has TOOLS:
+      `get_product`, `check_stock`, `create_order`, `send_stk_push`.
+      *You learn:* tool use / function calling, the agent loop, tools as gates.
+- [ ] **5.2 Close the sale** — agent confirms item + collects phone → calls
+      `send_stk_push` (the M4 rail) → M4 callback = truth marks it paid. The agent
+      never charges; it *requests* a charge the rails execute.
+      *You learn:* agent-proposes/code-disposes across a real payment.
+
+**Done when:** a buyer completes a sandbox purchase entirely through the on-page
+chat, and the order is real.
+
+---
+
+## M6 — Seller ↔ customer chat  `branch: m6-seller-chat`
+
+*Goal: the seller can step into the conversation.*
+
+- [ ] **6.1 Handoff + notify** — seller gets pinged when a buyer needs them; can
+      reply. Async first (notification + reply), live (websockets) later.
+      *You learn:* real-time transport, human-in-the-loop handoff.
+
+**Done when:** a seller answers a buyer's question inside the BOB chat.
+
+---
+
+## M7 — Reach + pilot  `branch: m7-pilot`
+
+*Goal: retention SMS + go live with a real seller.*
+
+- [ ] **7.1 Reach (SMS)** — consent registry + STOP; paced restock broadcasts;
+      🤖 agent drafts the message (seller approves), timing logic decides when.
+- [ ] **7.2 Hardening + deploy** — logging, rate limits, secrets audit; frontend
+      to Vercel, backend + Postgres + Redis to a VPS; real credentials.
+- [ ] **7.3 Pilot** — one real seller, one real order, end to end.
 
 **Done when:** money moves for real and nothing was touched by hand.
 
@@ -300,10 +328,12 @@ replying STOP removes it and the next broadcast skips it.
 
 | Session | Agent concept |
 |---------|---------------|
-| 1.2 Scraper | LLM as a **tool user**: unstructured caption → validated structured draft |
-| 5.3 Reach | LLM as a **proposer with guardrails**: drafts + timing, human approves, code enforces limits |
-| M2–M4 spine | Why agents need **deterministic rails**: state machines, idempotency, audit logs |
-| Future | Product Q&A agent on the BOB Page; WhatsApp channel swap behind `services/` |
+| 1.2 Scraper draft | LLM as **structured extractor**: image → validated draft |
+| 1.6 Smart drafting | LLM **reads a price it can see** but only *suggests* it — guardrail precision |
+| 3.2 Inbox triage | LLM as **filter + proposer** over a stream, human confirms |
+| 5.1–5.2 Checkout | LLM as **tool user** driving a real payment — proposes the STK, rails execute |
+| 7.1 Reach | LLM as **proposer with guardrails**: drafts + timing, human approves |
+| Spine (M4) | Why agents need **deterministic rails** built first: state machines, idempotency, "callback = truth" |
 
 The honest lesson of this build: an "agentic system" is ~20% LLM calls and ~80%
 rails that make those calls safe, observable, and reversible. We build the rails
@@ -323,3 +353,5 @@ first on purpose.
 | 2026-07-25 | M1.3 Products API — ingest/autofill/patch/public-page across schemas/service/routes; drafting split to on-demand (cost rail); 9 tests, 32 green (#11). CONCEPTS.md added (why-not-RAG etc.); Phase 2 generative try-on recorded |
 | 2026-07-25 | M1.4 Dashboard UI — Next.js seller screen (paste→ingest→autofill→price→publish), /media static mount. Live proof: real kinjobales ingest → Gemini named "Sundabests Insulated Beverage Dispenser" off the cover → published → public page (#12) |
 | 2026-07-25 | M1.5 Public BOB Page — server-rendered bob.link/<handle>, OG previews, 404+error boundaries, mobile-first, honest checkout-coming CTA. Screenshotted live. **M1 done-when met** → merge to main (#13) |
+| 2026-07-25 | **Roadmap pivot** (seller feedback): account-first shop ending in an on-page **agentic checkout** (WhatsApp close relocated to web; M-Pesa thesis kept). Milestones re-sequenced M2 accounts → M3 inbox → M4 M-Pesa rails → M5 agent checkout → M6 seller chat → M7 reach+pilot |
+| 2026-07-25 | M1.6 Smart drafting — agent reads printed price (suggested_price_kes, pre-fills box, seller confirms) + product/non-product flag. Fixes real complaint. Live: clog covers → KES 600/650/900 read correctly. Guardrail refined in CONCEPTS §4. 35 tests green |

@@ -42,6 +42,8 @@ export function ProductCard({
   const [busy, setBusy] = useState<null | "autofill" | "save" | "publish">(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null); // agent's language note
+  const [priceFromImage, setPriceFromImage] = useState(false); // price was pre-filled from the cover
+  const [notProduct, setNotProduct] = useState<string | null>(null); // agent thinks this isn't a product
 
   const cover = coverSrc(product.cover_url);
   const hasPrice = price.trim() !== "" && Number(price) > 0;
@@ -50,11 +52,22 @@ export function ProductCard({
     setBusy("autofill");
     setError(null);
     setNote(null);
+    setPriceFromImage(false);
+    setNotProduct(null);
     try {
       const result = await autofillProduct(product.id);
       setName(result.product.name);
       setDescription(result.product.description);
       onChange(result.product);
+      // Pre-fill the price ONLY if the agent read one off the image AND the
+      // seller hasn't typed their own yet — never overwrite the human.
+      if (result.suggested_price_kes != null && price.trim() === "") {
+        setPrice(String(result.suggested_price_kes));
+        setPriceFromImage(true);
+      }
+      if (!result.is_product) {
+        setNotProduct(result.not_product_reason || "This may not be a product.");
+      }
       if (result.language_note) setNote(result.language_note);
     } catch (e) {
       setError((e as Error).message);
@@ -112,6 +125,11 @@ export function ProductCard({
           Translated: {note}
         </p>
       )}
+      {notProduct && (
+        <p className="rounded bg-orange-50 px-2 py-1 text-xs text-orange-800 dark:bg-orange-950 dark:text-orange-200">
+          ⚠️ This may not be a product ({notProduct}). Review before publishing.
+        </p>
+      )}
 
       {/* Words (agent proposes, seller edits) */}
       <input
@@ -136,10 +154,22 @@ export function ProductCard({
             type="number"
             min={1}
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(e) => {
+              setPrice(e.target.value);
+              setPriceFromImage(false); // seller took over — it's their number now
+            }}
             placeholder="800"
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+            className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm dark:bg-zinc-950 ${
+              priceFromImage
+                ? "border-emerald-400 dark:border-emerald-600"
+                : "border-zinc-300 dark:border-zinc-700"
+            }`}
           />
+          {priceFromImage && (
+            <span className="mt-0.5 block text-[11px] text-emerald-600 dark:text-emerald-400">
+              read from image — confirm it
+            </span>
+          )}
         </label>
         <label className="flex-1 text-xs text-zinc-500">
           Stock

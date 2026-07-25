@@ -87,13 +87,14 @@ def ingest_seller_videos(db: Session, handle: str, limit: int = 6) -> list[Produ
 
 
 # ── Autofill: run the vision draft agent on ONE product (the 🤖 step) ─────────
-def autofill_product(db: Session, product_id: int) -> tuple[Product, list[str], str]:
-    """Draft a name + description for one product from its stored cover image.
+def autofill_product(db: Session, product_id: int) -> tuple[Product, "draft_agent.ProductDraft"]:
+    """Draft one product from its stored cover image.
 
-    Returns (product, suggested_tags, language_note). The agent's tags and
-    language note are display hints — we persist only name + description
-    (the fields the Product model has). Price/stock are untouched: the agent
-    literally cannot set them (its schema has no such field — CONCEPTS §4).
+    Returns (product, draft). We persist ONLY name + description onto the
+    product. The draft's suggested_price_kes is passed back to the caller as a
+    SUGGESTION (it pre-fills the seller's price box) but is NEVER written to
+    product.price_kes here — the seller's PATCH remains the only writer of the
+    stored price (CONCEPTS §4). Stock is likewise untouched.
     """
     product = db.get(Product, product_id)
     if product is None:
@@ -104,18 +105,19 @@ def autofill_product(db: Session, product_id: int) -> tuple[Product, list[str], 
     if cover_bytes is None:
         raise ProductError("This product has no stored cover image to draft from.")
 
-    result = draft_agent.draft_from_video(  # may raise DraftError
+    draft = draft_agent.draft_from_video(  # may raise DraftError
         cover_bytes=cover_bytes,
         caption=product.caption,
         hashtags=[h.get("name", "") for h in product.hashtags],
     )
 
-    # The agent PROPOSES; we write only the descriptive fields.
-    product.name = result.name
-    product.description = result.description
+    # The agent PROPOSES; we write only the descriptive fields. Price stays the
+    # seller's — the suggestion rides back in `draft`, it does not land here.
+    product.name = draft.name
+    product.description = draft.description
     db.commit()
     db.refresh(product)
-    return product, result.tags, result.language_note
+    return product, draft
 
 
 def _read_cover_bytes(product: Product) -> bytes | None:
