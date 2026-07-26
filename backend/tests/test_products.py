@@ -274,3 +274,39 @@ def test_public_page_shows_published_hides_drafts(client, db_session):
 
 def test_public_page_unknown_handle_is_404(client):
     assert client.get("/api/pages/nobody_here").status_code == 404
+
+
+# ── Sales chat (agent mocked) ─────────────────────────────────────────────────
+def test_shop_chat_answers(client, db_session, monkeypatch):
+    from app.agent import sales
+
+    me = _account(db_session)
+    s = _seller(db_session, me, handle="chatshop")
+    _product(db_session, s, vid="800", status=ProductStatus.PUBLISHED, price=500, stock=3, name="Blue Dress")
+    db_session.commit()
+
+    captured = {}
+
+    def _fake_answer(shop_name, catalogue, history, featured=None):
+        captured["catalogue"] = catalogue
+        return "We have a Blue Dress for KES 500!"
+
+    monkeypatch.setattr(sales, "answer", _fake_answer)
+    r = client.post("/api/pages/chatshop/chat", json={"messages": [{"role": "user", "content": "got dresses?"}]})
+    assert r.status_code == 200
+    assert "Blue Dress" in r.json()["reply"]
+    # the agent was grounded in the real catalogue
+    assert any(item.name == "Blue Dress" and item.price_kes == 500 for item in captured["catalogue"])
+
+
+def test_shop_chat_rejects_non_user_first_message(client, db_session):
+    me = _account(db_session)
+    _seller(db_session, me, handle="chatshop2")
+    db_session.commit()
+    r = client.post("/api/pages/chatshop2/chat", json={"messages": [{"role": "assistant", "content": "hi"}]})
+    assert r.status_code == 400
+
+
+def test_shop_chat_unknown_shop_is_404(client):
+    r = client.post("/api/pages/nobody/chat", json={"messages": [{"role": "user", "content": "hi"}]})
+    assert r.status_code == 404

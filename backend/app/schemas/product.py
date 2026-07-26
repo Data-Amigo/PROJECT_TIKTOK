@@ -92,6 +92,7 @@ class ProductPublicOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    tiktok_video_id: str        # lets a ?v=<id> link feature the product-from-video
     cover_url: str | None
     name: str
     description: str

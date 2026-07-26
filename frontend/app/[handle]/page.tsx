@@ -20,7 +20,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { coverSrc, fetchPublicPage, SHOP_NOT_FOUND } from "@/lib/api";
-import { PublicProductCard } from "@/components/PublicProductCard";
+import { ShopExperience } from "@/components/ShopExperience";
 
 // sokolink/<handle> — Next 16 hands params as a Promise.
 type Params = Promise<{ handle: string }>;
@@ -68,59 +68,18 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 
-export default async function BobPage({ params }: { params: Params }) {
+export default async function ShopPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: Promise<{ v?: string }>;
+}) {
   const { handle } = await params;
+  const { v } = await searchParams; // ?v=<video_id> → feature the product from that video
   const shop = await loadShop(handle);          // may throw → error.tsx boundary
   if (shop === SHOP_NOT_FOUND) notFound();      // → not-found.tsx (real 404)
 
-  const avatar = coverSrc(shop.avatar_url);
-
-  return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
-        {/* Shop header — the trust signal: who am I buying from? */}
-        <header className="mb-8 flex items-center gap-4">
-          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-            {avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element -- backend/CDN host
-              <img src={avatar} alt={shop.display_name} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-xl font-bold text-zinc-400">
-                {shop.display_name.charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
-              {shop.display_name}
-            </h1>
-            <p className="text-sm text-zinc-500">@{shop.handle} · Pay with M-Pesa</p>
-          </div>
-        </header>
-
-        {/* Product grid — 2-up on phones (most buyers), more on wider screens. */}
-        {shop.products.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {shop.products.map((p) => (
-              <PublicProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-zinc-300 py-16 text-center dark:border-zinc-700">
-            <p className="text-sm text-zinc-500">
-              {shop.display_name} hasn&apos;t posted any drops yet — check back soon.
-            </p>
-          </div>
-        )}
-
-        {/* Trust footer */}
-        <footer className="mt-12 border-t border-zinc-200 pt-6 text-center dark:border-zinc-800">
-          <p className="text-xs text-zinc-400">
-            Powered by <span className="font-semibold text-zinc-600 dark:text-zinc-300">SokoLink</span>{" "}
-            · Where your audience becomes your customers
-          </p>
-        </footer>
-      </main>
-    </div>
-  );
+  // Server-fetched data (fast, SEO) handed to the interactive client experience.
+  return <ShopExperience shop={shop} featuredVideoId={v ?? null} />;
 }

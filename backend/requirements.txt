@@ -18,6 +18,7 @@ alembic==1.18.5                  # schema migrations (backend/alembic/)
 
 # ── AI (vision draft agent) ───────────────────────────────
 openai==2.48.0                   # GPT vision + structured outputs (product drafts)
+anthropic==0.118.0               # customer sales chat (M5)
 # google-genai kept installed as an optional legacy vision provider
 
 # ── Auth ──────────────────────────────────────────────────
