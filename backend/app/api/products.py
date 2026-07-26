@@ -17,11 +17,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.agent import sales
 from app.agent.draft import DraftError, DraftQuotaError
 from app.api.deps import get_current_account
 from app.db import get_db
 from app.models.account import Account
 from app.models.product import Product
+from app.schemas.chat import ChatIn, ChatOut
 from app.schemas.product import (
     AutodraftOut,
     AutofillOut,
@@ -131,3 +133,45 @@ def public_page(handle: str, db: Session = Depends(get_db)) -> PublicPageOut:
         avatar_url=seller.avatar_url,
         products=[ProductPublicOut.model_validate(p) for p in svc.public_products(seller)],
     )
+
+
+@pages_router.post("/{handle}/chat", response_model=ChatOut)
+def shop_chat(handle: str, body: ChatIn, db: Session = Depends(get_db)) -> ChatOut:
+    """The 🤖 sales agent: answers a buyer's question from THIS shop's catalogue.
+    Public (buyers aren't logged in). Answers only — the M-Pesa 'Buy Now' is M4."""
+    try:
+        seller = svc.get_public_page(db, handle)
+    except svc.ProductError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
+
+    # The conversation must start with a buyer turn (Anthropic requires it).
+    if body.messages[0].role != "user":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Conversation must start with a customer message.")
+
+    published = svc.public_products(seller)
+    catalogue = [
+        sales.CatalogueItem(
+            name=p.name or "Untitled",
+            price_kes=p.price_kes,
+            available=p.is_available,
+            description=p.description,
+        )
+        for p in published
+    ]
+    featured = None
+    if body.video_id:
+        match = next((p for p in published if p.tiktok_video_id == body.video_id), None)
+        if match is not None:
+            featured = sales.CatalogueItem(
+                name=match.name or "Untitled",
+                price_kes=match.price_kes,
+                available=match.is_available,
+                description=match.description,
+            )
+
+    history = [{"role": m.role, "content": m.content} for m in body.messages]
+    try:
+        reply = sales.answer(seller.display_name, catalogue, history, featured)
+    except sales.SalesError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    return ChatOut(reply=reply)

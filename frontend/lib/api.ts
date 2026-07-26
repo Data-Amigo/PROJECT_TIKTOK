@@ -67,12 +67,15 @@ export type AutodraftResult = { products: Product[]; ai_paused: boolean };
 /** Buyer-facing product card — mirrors ProductPublicOut (deliberately narrow). */
 export type PublicProduct = {
   id: number;
+  tiktok_video_id: string;
   cover_url: string | null;
   name: string;
   description: string;
   price_kes: number | null;
   is_available: boolean;
 };
+
+export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 /** The whole public shop page — mirrors PublicPageOut. */
 export type PublicPage = {
@@ -236,4 +239,20 @@ export async function fetchPublicPage(handle: string): Promise<PublicPage | type
   if (res.status === 404) return SHOP_NOT_FOUND;
   if (!res.ok) throw new Error(`Shop fetch failed (${res.status})`);
   return res.json();
+}
+
+/** Ask the shop's 🤖 sales agent. `messages` is the conversation (starts with a
+ *  user turn); `videoId` is the video the buyer arrived from (?v=), if any. */
+export async function chatWithShop(
+  handle: string,
+  messages: ChatMessage[],
+  videoId: string | null,
+): Promise<string> {
+  const res = await fetch(`${API_URL}/api/pages/${encodeURIComponent(handle)}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, video_id: videoId }),
+  });
+  const data = await (await throwOnError(res)).json();
+  return data.reply as string;
 }
