@@ -315,14 +315,18 @@ buyer taps  sokolink/<handle>?v=<video_id>
 └───────────────────────────────┘
 ```
 
-- [ ] **5.0 Per-video context links** — the seller's link carries `?v=<video_id>`;
-      the public page resolves it to the featured product and greets the buyer with
-      it. (No AI/payment yet — pure context + a product-from-video hero + a
-      bottom-sheet catalogue.) *You learn:* deep-linking context, bottom-sheet UX.
-- [ ] **5.1 Chat agent (Claude) + tools** — on-page chat; answers product questions
-      from the DB (direct lookup, not RAG): "in red?", "cheaper?", "under KES 1000?".
-      TOOLS: `get_product`, `search_catalogue`, `check_stock`, `create_order`,
-      `send_stk_push`. *You learn:* tool use / function calling, the agent loop.
+- [x] **5.0 Per-video context links** — `?v=<video_id>` features the
+      product-from-video (hero); catalogue is a bottom-sheet. ProductPublicOut
+      exposes `tiktok_video_id` for the match. Live-proven.
+- [x] **5.1 Chat agent (Claude)** — `agent/sales.py`: claude-haiku-4-5 answers
+      buyer questions grounded ONLY in the shop's published catalogue (direct
+      context injection, not RAG); public `POST /api/pages/{handle}/chat`,
+      input-capped. `ShopExperience.tsx`: hero + AI chat (contextual greeting,
+      Sheng-aware) + bottom-sheet. Live: answered a real buyer Q in context.
+      (Built before M4 per Fredrick — the chat touches no money.) TOOLS
+      (`create_order`, `send_stk_push`) come with 5.2 after M4.
+      *You learned:* context injection vs RAG, a grounded chat agent, per-video
+      deep-linking, bottom-sheet UX.
 - [ ] **5.2 Close the sale** — agent confirms item + collects phone → calls
       `send_stk_push` (the M4 rail) → M4 callback = truth marks it paid. The agent
       never charges; it *requests* a charge the rails execute.
