@@ -19,12 +19,18 @@ import { useEffect, useRef, useState } from "react";
 import {
   chatWithShop,
   coverSrc,
+  resolveVideo,
   type ChatMessage,
   type PublicPage,
   type PublicProduct,
 } from "@/lib/api";
 import { OrderButton } from "@/components/OrderButton";
 import { PublicProductCard } from "@/components/PublicProductCard";
+
+/** Spot a TikTok link in free text (full OR short) so the chat can resolve it
+ *  to a product instead of shipping the raw URL to the AI. Mirrors the hosts
+ *  the backend accepts. */
+const TIKTOK_LINK = /https?:\/\/(?:[\w-]+\.)?tiktok\.com\/[^\s]+/i;
 
 export function ShopExperience({
   shop,
@@ -33,12 +39,24 @@ export function ShopExperience({
   shop: PublicPage;
   featuredVideoId: string | null;
 }) {
-  const featured =
-    (featuredVideoId && shop.products.find((p) => p.tiktok_video_id === featuredVideoId)) ||
-    null;
+  const initialFeatured =
+    (featuredVideoId && shop.products.find((p) => p.tiktok_video_id === featuredVideoId)) || null;
 
+  // Featured is STATE (not derived): a pasted TikTok link can change it after load.
+  const [featured, setFeatured] = useState<PublicProduct | null>(initialFeatured);
   const avatar = coverSrc(shop.avatar_url);
   const [catalogueOpen, setCatalogueOpen] = useState(false);
+
+  /** One place to feature a product (from a paste, in the box or the chat): set
+   *  the hero AND rewrite ?v= so the URL stays shareable and survives refresh. */
+  function featureProduct(p: PublicProduct) {
+    setFeatured(p);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("v", p.tiktok_video_id);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
@@ -61,6 +79,9 @@ export function ShopExperience({
           </div>
         </header>
 
+        {/* Paste-a-TikTok-link → jump to that product (context TikTok won't give us) */}
+        <PasteBox handle={shop.handle} onFeature={featureProduct} hasFeatured={featured !== null} />
+
         {/* Product-from-video hero */}
         {featured && <FeaturedHero product={featured} />}
 
@@ -70,7 +91,8 @@ export function ShopExperience({
           shopName={shop.display_name}
           avatar={avatar}
           featured={featured}
-          videoId={featuredVideoId}
+          videoId={featured?.tiktok_video_id ?? featuredVideoId}
+          onFeature={featureProduct}
         />
 
         {/* Browse all */}
@@ -135,6 +157,69 @@ function FeaturedHero({ product }: { product: PublicProduct }) {
   );
 }
 
+// ── Paste-a-TikTok-link ──────────────────────────────────────────────────────
+// TikTok won't tell us which video a shopper watched, so we let the shopper
+// bring it: they tap "Copy link" on the video and paste it here → we feature it.
+function PasteBox({
+  handle,
+  onFeature,
+  hasFeatured,
+}: {
+  handle: string;
+  onFeature: (p: PublicProduct) => void;
+  hasFeatured: boolean;
+}) {
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  async function go() {
+    const link = url.trim();
+    if (!link || busy) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const { product } = await resolveVideo(handle, link);
+      if (product) {
+        onFeature(product);
+        setUrl("");
+      } else {
+        setNote("Sijaipata hiyo video hapa 😅 — try 'Browse all products' below.");
+      }
+    } catch {
+      setNote("Hiyo link haikufanya kazi — jaribu tena.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-5 rounded-2xl border border-dashed border-zinc-300 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+      <label className="mb-1.5 block px-1 text-xs font-medium text-zinc-500">
+        🔗 {hasFeatured ? "Saw a different video? Paste its TikTok link" : "Paste the TikTok video link to see that item"}
+      </label>
+      <div className="flex gap-2">
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && go()}
+          placeholder="vm.tiktok.com/…"
+          inputMode="url"
+          className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+        />
+        <button
+          onClick={go}
+          disabled={busy || !url.trim()}
+          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-40 dark:bg-white dark:text-black"
+        >
+          {busy ? "…" : "Go"}
+        </button>
+      </div>
+      {note && <p className="mt-1.5 px-1 text-xs text-amber-600">{note}</p>}
+    </div>
+  );
+}
+
 // ── AI chat ──────────────────────────────────────────────────────────────────
 function ShopChat({
   handle,
@@ -142,12 +227,14 @@ function ShopChat({
   avatar,
   featured,
   videoId,
+  onFeature,
 }: {
   handle: string;
   shopName: string;
   avatar: string | null;
   featured: PublicProduct | null;
   videoId: string | null;
+  onFeature: (p: PublicProduct) => void;
 }) {
   const greeting = featured
     ? `Hi 👋 You're looking at the ${featured.name} — how can I help?`
@@ -170,6 +257,29 @@ function ShopChat({
     const next: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages(next);
     setTyping(true);
+
+    // If the customer dropped a TikTok link, resolve it to a product ourselves
+    // (feature it + a natural reply) instead of sending a raw URL to the AI.
+    const link = text.match(TIKTOK_LINK)?.[0];
+    if (link) {
+      try {
+        const { product } = await resolveVideo(handle, link);
+        if (product) {
+          onFeature(product);
+          const price = product.price_kes != null ? `KES ${product.price_kes.toLocaleString()}` : "bei on request";
+          const tail = product.is_available ? "Bado iko 😊 Ungependa?" : "Lakini kwa sasa imeisha 😔";
+          setMessages([...next, { role: "assistant", content: `Hiyo ni ${product.name}! ${price} — ${tail}` }]);
+        } else {
+          setMessages([...next, { role: "assistant", content: "Sijaipata hiyo video hapa 😅 — bonyeza 'Browse all products' uone zote." }]);
+        }
+      } catch {
+        setMessages([...next, { role: "assistant", content: "Hiyo link haikufanya kazi — jaribu tena." }]);
+      } finally {
+        setTyping(false);
+      }
+      return;
+    }
+
     try {
       const reply = await chatWithShop(handle, next.slice(1), videoId); // drop static greeting
       setMessages([...next, { role: "assistant", content: reply }]);

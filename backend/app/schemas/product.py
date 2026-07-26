@@ -109,3 +109,19 @@ class PublicPageOut(BaseModel):
     display_name: str
     avatar_url: str | None
     products: list[ProductPublicOut]
+
+
+class ResolveVideoIn(BaseModel):
+    """A customer pastes a TikTok video link (full or short) — or text with one
+    in it — and we find which product it is. Capped: this is a link, not an essay."""
+
+    url: str = Field(min_length=1, max_length=500, description="Pasted TikTok video link / share text")
+
+
+class ResolveVideoOut(BaseModel):
+    """What the paste resolved to. `product` is null when we couldn't match the
+    link to one of THIS shop's products (wrong creator, no product on that video,
+    or an unreadable link) — the UI then shows a friendly 'not found'."""
+
+    video_id: str | None = None
+    product: ProductPublicOut | None = None

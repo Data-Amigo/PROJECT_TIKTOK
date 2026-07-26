@@ -312,6 +312,37 @@ def test_shop_chat_unknown_shop_is_404(client):
     assert r.status_code == 404
 
 
+def test_resolve_video_matches_a_pasted_link_to_a_product(client, db_session):
+    me = _account(db_session)
+    s = _seller(db_session, me, handle="pasteshop")
+    vid = "9900000000000000123"  # synthetic — the real ids live in the shared DB
+    _product(db_session, s, vid=vid, status=ProductStatus.PUBLISHED,
+             price=600, stock=2, name="Ripped Jeans")
+    db_session.commit()
+
+    r = client.post(
+        "/api/pages/pasteshop/resolve-video",
+        json={"url": f"https://www.tiktok.com/@classycloset/video/{vid}?is_from_webapp=1"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["video_id"] == vid
+    assert body["product"]["name"] == "Ripped Jeans"
+
+
+def test_resolve_video_unmatched_link_returns_null_product(client, db_session):
+    me = _account(db_session)
+    _seller(db_session, me, handle="pasteshop2")
+    db_session.commit()
+    # A well-formed TikTok link, but no product on that video in THIS shop.
+    r = client.post(
+        "/api/pages/pasteshop2/resolve-video",
+        json={"url": "https://www.tiktok.com/@someoneelse/video/1111111111111111111"},
+    )
+    assert r.status_code == 200
+    assert r.json()["product"] is None
+
+
 def test_system_prompt_grounds_and_guards():
     """The prompt (where the conversational intelligence lives) must: inject the
     live catalogue as the source of truth, decode Sheng, forbid inventing
