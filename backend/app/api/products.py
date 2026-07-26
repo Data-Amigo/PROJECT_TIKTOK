@@ -137,14 +137,14 @@ def public_page(handle: str, db: Session = Depends(get_db)) -> PublicPageOut:
 
 @pages_router.post("/{handle}/chat", response_model=ChatOut)
 def shop_chat(handle: str, body: ChatIn, db: Session = Depends(get_db)) -> ChatOut:
-    """The 🤖 sales agent: answers a buyer's question from THIS shop's catalogue.
+    """The 💬 sales agent: answers a buyer's question from THIS shop's catalogue.
     Public (buyers aren't logged in). Answers only — the M-Pesa 'Buy Now' is M4."""
     try:
         seller = svc.get_public_page(db, handle)
     except svc.ProductError as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
 
-    # The conversation must start with a buyer turn (Anthropic requires it).
+    # A conversation must start with a buyer turn (the greeting is UI-only).
     if body.messages[0].role != "user":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Conversation must start with a customer message.")
 
