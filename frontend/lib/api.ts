@@ -61,6 +61,9 @@ export type AutofillResult = {
   language_note: string;
 };
 
+/** Batch auto-draft result. ai_paused = the AI cap stopped the run partway. */
+export type AutodraftResult = { products: Product[]; ai_paused: boolean };
+
 /** Buyer-facing product card — mirrors ProductPublicOut (deliberately narrow). */
 export type PublicProduct = {
   id: number;
@@ -178,7 +181,17 @@ export async function refreshProducts(): Promise<Product[]> {
   return (await throwOnError(res)).json();
 }
 
-/** Run the 🤖 vision agent on one product (fills name + description). */
+/** Auto-draft all un-drafted products (name/description + a readable price).
+ *  The seller only reviews + publishes — no per-product clicking. */
+export async function autodraftProducts(): Promise<AutodraftResult> {
+  const res = await fetch(`${API_URL}/api/products/autodraft`, {
+    method: "POST",
+    headers: authHeader(),
+  });
+  return (await throwOnError(res)).json();
+}
+
+/** Run the 🤖 vision agent on ONE product (manual fallback when AI is paused). */
 export async function autofillProduct(id: number): Promise<AutofillResult> {
   const res = await fetch(`${API_URL}/api/products/${id}/autofill`, {
     method: "POST",

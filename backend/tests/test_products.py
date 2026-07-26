@@ -143,7 +143,7 @@ def test_cannot_autofill_another_sellers_product(client, db_session):
 
 
 # ── Autofill (agent mocked) ───────────────────────────────────────────────────
-def test_autofill_sets_words_suggests_price_never_persists_it(client, db_session, monkeypatch):
+def test_autofill_drafts_and_persists_draft_price(client, db_session, monkeypatch):
     me = _account(db_session)
     p = _product(db_session, _seller(db_session, me), vid="500")
     p.cover_url = "covers/500.jpg"
@@ -159,7 +159,63 @@ def test_autofill_sets_words_suggests_price_never_persists_it(client, db_session
     body = client.post(f"/api/products/{p.id}/autofill", headers=_auth(me)).json()
     assert body["product"]["name"] == "Fluffy Duvet"
     assert body["suggested_price_kes"] == 600
-    assert body["product"]["price_kes"] is None   # guardrail: not persisted
+    # The AI-read price is now persisted as a DRAFT price (removes typing)...
+    assert body["product"]["price_kes"] == 600
+    # ...but the product is NOT live — publish is still the human gate.
+    assert body["product"]["status"] == "draft"
+
+
+def test_autofill_does_not_clobber_a_seller_set_price(client, db_session, monkeypatch):
+    me = _account(db_session)
+    p = _product(db_session, _seller(db_session, me), vid="502", price=999)  # seller already priced it
+    p.cover_url = "covers/502.jpg"
+    db_session.flush()
+    fake = draft_mod.ProductDraft(
+        is_product=True, name="X", description="", tags=[], suggested_price_kes=600, language_note="",
+    )
+    monkeypatch.setattr(svc, "_read_cover_bytes", lambda product: b"img")
+    monkeypatch.setattr(draft_mod, "draft_from_video", lambda **kw: fake)
+    body = client.post(f"/api/products/{p.id}/autofill", headers=_auth(me)).json()
+    assert body["product"]["price_kes"] == 999   # seller's price wins
+
+
+def test_autodraft_drafts_all_undrafted(client, db_session, monkeypatch):
+    me = _account(db_session)
+    s = _seller(db_session, me, handle="autoshop")
+    a = _product(db_session, s, vid="510"); a.cover_url = "covers/510.jpg"
+    b = _product(db_session, s, vid="511"); b.cover_url = "covers/511.jpg"
+    done = _product(db_session, s, vid="512", name="Already named"); done.cover_url = "covers/512.jpg"
+    db_session.flush()
+
+    fake = draft_mod.ProductDraft(
+        is_product=True, name="AI Drafted", description="d", tags=[], suggested_price_kes=700, language_note="",
+    )
+    monkeypatch.setattr(svc, "_read_cover_bytes", lambda product: b"img")
+    monkeypatch.setattr(draft_mod, "draft_from_video", lambda **kw: fake)
+
+    body = client.post("/api/products/autodraft", headers=_auth(me)).json()
+    assert body["ai_paused"] is False
+    by_vid = {p["tiktok_video_id"]: p for p in body["products"]}
+    assert by_vid["510"]["name"] == "AI Drafted" and by_vid["510"]["price_kes"] == 700
+    assert by_vid["511"]["name"] == "AI Drafted"
+    assert by_vid["512"]["name"] == "Already named"   # left untouched (idempotent)
+
+
+def test_autodraft_pauses_on_quota(client, db_session, monkeypatch):
+    me = _account(db_session)
+    s = _seller(db_session, me, handle="quotashop2")
+    p = _product(db_session, s, vid="520"); p.cover_url = "covers/520.jpg"
+    db_session.flush()
+
+    def _quota(**kw):
+        raise draft_mod.DraftQuotaError("limit reached")
+
+    monkeypatch.setattr(svc, "_read_cover_bytes", lambda product: b"img")
+    monkeypatch.setattr(draft_mod, "draft_from_video", _quota)
+
+    body = client.post("/api/products/autodraft", headers=_auth(me)).json()
+    assert body["ai_paused"] is True
+    assert body["products"][0]["name"] == ""   # left un-drafted for manual fallback
 
 
 def test_autofill_quota_returns_429(client, db_session, monkeypatch):

@@ -74,13 +74,55 @@ def autofill_product(
         hashtags=[h.get("name", "") for h in product.hashtags],
     )
 
-    # The agent PROPOSES; we write only the descriptive fields. Price stays the
-    # seller's — the suggestion rides back in `draft`, it does not land here.
-    product.name = draft.name
-    product.description = draft.description
+    _apply_draft(product, draft)
     db.commit()
     db.refresh(product)
     return product, draft
+
+
+def _apply_draft(product: Product, draft: "draft_agent.ProductDraft") -> None:
+    """Write an agent draft onto a product. Name/description are the agent's to
+    fill. The AI-read price is written as a DRAFT price (price_kes) ONLY when the
+    seller hasn't set one — but the product stays DRAFT. Going LIVE still needs
+    the seller's explicit Publish (the human gate). So the AI removes typing, it
+    never sells anything at an unconfirmed price. See CONCEPTS §4."""
+    product.name = draft.name
+    product.description = draft.description
+    if product.price_kes is None and draft.suggested_price_kes is not None:
+        product.price_kes = draft.suggested_price_kes
+
+
+def autodraft_account(db: Session, account: Account) -> tuple[list[Product], bool]:
+    """Auto-draft EVERY un-drafted product for the account — the seller does no
+    clicking; the shop fills itself. Best-effort: images that fail are skipped;
+    the AI usage cap STOPS the batch (returns ai_paused=True) so we never hammer
+    a dead quota. Idempotent — already-drafted products are left untouched."""
+    seller = db.scalar(select(Seller).where(Seller.account_id == account.id))
+    if seller is None:
+        return [], False
+
+    ai_paused = False
+    for product in list(seller.products):
+        if product.name.strip():
+            continue  # already drafted — skip (idempotent + cost-bounded)
+        cover = _read_cover_bytes(product)
+        if cover is None:
+            continue  # no image to read; leave for the seller
+        try:
+            draft = draft_agent.draft_from_video(
+                cover_bytes=cover,
+                caption=product.caption,
+                hashtags=[h.get("name", "") for h in product.hashtags],
+            )
+        except draft_agent.DraftQuotaError:
+            ai_paused = True
+            break  # stop — the daily cap is hit; don't burn the rest failing
+        except draft_agent.DraftError:
+            continue  # one unreadable image shouldn't sink the whole batch
+        _apply_draft(product, draft)
+        db.commit()  # per-product → partial progress survives a later quota stop
+
+    return list_account_products(db, account), ai_paused
 
 
 def _read_cover_bytes(product: Product) -> bytes | None:

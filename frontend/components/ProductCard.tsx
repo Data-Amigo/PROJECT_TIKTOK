@@ -112,14 +112,18 @@ export function ProductCard({
         <StatusBadge product={product} />
       </div>
 
-      {/* Auto-fill (the 🤖 step) */}
-      <button
-        onClick={runAutofill}
-        disabled={busy !== null}
-        className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-      >
-        {busy === "autofill" ? "Reading the image…" : "✨ Auto-fill from image"}
-      </button>
+      {/* Auto-fill is a MANUAL FALLBACK only — products are drafted
+          automatically on connect/refresh. This shows only when a product came
+          back un-drafted (e.g. the AI daily limit was hit). */}
+      {!product.name && (
+        <button
+          onClick={runAutofill}
+          disabled={busy !== null}
+          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        >
+          {busy === "autofill" ? "Reading the image…" : "✨ Auto-fill from image"}
+        </button>
+      )}
       {note && (
         <p className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
           Translated: {note}

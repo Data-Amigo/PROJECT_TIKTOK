@@ -1,16 +1,25 @@
 """Auth endpoints — signup, login, /me. The full security surface, end to end."""
 
+import random
+
 from sqlalchemy import select
 
 from app.models.account import Account
 from app.security import create_access_token
 
+# Randomized per run so these tests never collide with a REAL committed account
+# (email/phone are DB-unique; a fixed test phone once clashed with live data).
+# Tests roll back, so this base stays constant within a run — dup-detection
+# tests still work.
+_SUFFIX = random.randint(10_000_000, 99_999_999)
 BASE = {
     "name": "Mama Wanjiku",
-    "email": "mama@example.com",
-    "phone": "0712345678",
+    "email": f"mama_{_SUFFIX}@example.com",
+    "phone": f"07{_SUFFIX}",  # → 254 7 XXXXXXXX after normalization
     "password": "supersecret",
 }
+_EMAIL = BASE["email"]
+_PHONE = f"2547{_SUFFIX}"  # what "07{suffix}" normalizes to
 
 
 def _signup(client, **overrides):
@@ -24,9 +33,9 @@ def test_signup_creates_account_hashes_password_normalizes_phone(client, db_sess
     assert r.json()["token_type"] == "bearer"
     assert r.json()["access_token"]
 
-    acct = db_session.scalar(select(Account).where(Account.email == "mama@example.com"))
+    acct = db_session.scalar(select(Account).where(Account.email == _EMAIL))
     assert acct is not None
-    assert acct.phone == "254712345678"                 # normalized at the border
+    assert acct.phone == _PHONE                 # normalized at the border
     assert acct.password_hash != "supersecret"          # never stored in the clear
     assert acct.password_hash.startswith("$argon2")     # Argon2id
 
@@ -58,14 +67,14 @@ def test_signup_rejects_short_password(client):
 # ── Login ─────────────────────────────────────────────────────────────────────
 def test_login_succeeds_with_correct_credentials(client):
     _signup(client)
-    r = client.post("/api/auth/login", json={"email": "mama@example.com", "password": "supersecret"})
+    r = client.post("/api/auth/login", json={"email": _EMAIL, "password": "supersecret"})
     assert r.status_code == 200
     assert r.json()["access_token"]
 
 
 def test_login_wrong_password_is_401(client):
     _signup(client)
-    r = client.post("/api/auth/login", json={"email": "mama@example.com", "password": "WRONGPASS"})
+    r = client.post("/api/auth/login", json={"email": _EMAIL, "password": "WRONGPASS"})
     assert r.status_code == 401
 
 
@@ -91,8 +100,8 @@ def test_me_returns_the_account_without_the_hash(client):
     r = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     body = r.json()
-    assert body["email"] == "mama@example.com"
-    assert body["phone"] == "254712345678"
+    assert body["email"] == _EMAIL
+    assert body["phone"] == _PHONE
     assert "password_hash" not in body   # the response schema can't leak it
 
 

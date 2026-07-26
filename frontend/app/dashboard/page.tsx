@@ -3,15 +3,18 @@
 /**
  * Seller dashboard — the account-first shop manager.
  *
- *   log in ──▶ (no TikTok yet) Connect screen ──▶ (connected) storefront + products
+ *   log in ─▶ (no TikTok) Connect ─▶ (connected) storefront + AUTO-DRAFTED products
  *
- * All calls are authenticated (lib/api attaches the token). A client component
- * because it's stateful and interactive.
+ * The seller does no per-product "auto-fill" clicking: on connect (and when new
+ * videos arrive) every un-drafted product is drafted automatically by the AI
+ * (name, description, and a price it can read). The seller only reviews, sets
+ * any missing prices, and publishes.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  autodraftProducts,
   connectTikTok,
   coverSrc,
   fetchMyProducts,
@@ -31,6 +34,25 @@ export default function DashboardPage() {
   const [storefront, setStorefront] = useState<Storefront | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [phase, setPhase] = useState<Phase>("loading");
+  const [drafting, setDrafting] = useState(false);
+  const [aiPaused, setAiPaused] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Load the seller's products, then auto-draft any that aren't drafted yet.
+  const loadAndDraft = useCallback(async () => {
+    const initial = await fetchMyProducts();
+    setProducts(initial);
+    if (initial.some((p) => !p.name.trim())) {
+      setDrafting(true);
+      try {
+        const res = await autodraftProducts();
+        setProducts(res.products);
+        setAiPaused(res.ai_paused);
+      } finally {
+        setDrafting(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetchMe().then(async (acct) => {
@@ -42,24 +64,38 @@ export default function DashboardPage() {
       const shop = await fetchStorefront();
       if (shop) {
         setStorefront(shop);
-        setProducts(await fetchMyProducts());
         setPhase("shop");
+        await loadAndDraft();
       } else {
         setPhase("connect");
       }
     });
-  }, [router]);
+  }, [router, loadAndDraft]);
+
+  const onConnected = useCallback(
+    async (shop: Storefront) => {
+      setStorefront(shop);
+      setPhase("shop");
+      await loadAndDraft();
+    },
+    [loadAndDraft],
+  );
+
+  async function onRefresh() {
+    setRefreshing(true);
+    setAiPaused(false);
+    try {
+      setProducts(await refreshProducts()); // pull new videos (un-drafted)
+      await loadAndDraft(); // draft whatever's new
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   function signOut() {
     logout();
     router.replace("/login");
   }
-
-  const onConnected = useCallback(async (shop: Storefront) => {
-    setStorefront(shop);
-    setProducts(await fetchMyProducts());
-    setPhase("shop");
-  }, []);
 
   const replaceProduct = (updated: Product) =>
     setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
@@ -74,7 +110,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      {/* Top nav */}
       <nav className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <span className="text-lg font-bold tracking-tight">
@@ -96,7 +131,10 @@ export default function DashboardPage() {
           <ShopView
             storefront={storefront}
             products={products}
-            onProducts={setProducts}
+            drafting={drafting}
+            aiPaused={aiPaused}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
             onReplaceProduct={replaceProduct}
           />
         )
@@ -105,7 +143,7 @@ export default function DashboardPage() {
   );
 }
 
-// ── Connect screen (no TikTok yet) ───────────────────────────────────────────
+// ── Connect screen ────────────────────────────────────────────────────────────
 function ConnectScreen({ onConnected }: { onConnected: (s: Storefront) => void }) {
   const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
@@ -116,8 +154,7 @@ function ConnectScreen({ onConnected }: { onConnected: (s: Storefront) => void }
     setBusy(true);
     setError(null);
     try {
-      const shop = await connectTikTok(username.trim());
-      onConnected(shop);
+      onConnected(await connectTikTok(username.trim()));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -130,8 +167,8 @@ function ConnectScreen({ onConnected }: { onConnected: (s: Storefront) => void }
       <div className="text-5xl">🔗</div>
       <h1 className="mt-4 text-2xl font-bold tracking-tight">Connect your TikTok</h1>
       <p className="mt-2 text-sm text-zinc-500">
-        We&apos;ll pull your recent videos and turn them into products you can price and sell —
-        your audience becomes your customers.
+        We&apos;ll pull your recent videos and draft them into products automatically —
+        you just review, price, and publish.
       </p>
       <div className="mt-8 flex gap-2">
         <input
@@ -158,29 +195,25 @@ function ConnectScreen({ onConnected }: { onConnected: (s: Storefront) => void }
   );
 }
 
-// ── Shop view (connected) ────────────────────────────────────────────────────
+// ── Shop view ────────────────────────────────────────────────────────────────
 function ShopView({
   storefront,
   products,
-  onProducts,
+  drafting,
+  aiPaused,
+  refreshing,
+  onRefresh,
   onReplaceProduct,
 }: {
   storefront: Storefront;
   products: Product[];
-  onProducts: (p: Product[]) => void;
+  drafting: boolean;
+  aiPaused: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
   onReplaceProduct: (p: Product) => void;
 }) {
-  const [refreshing, setRefreshing] = useState(false);
   const avatar = coverSrc(storefront.avatar_url);
-
-  async function refresh() {
-    setRefreshing(true);
-    try {
-      onProducts(await refreshProducts());
-    } finally {
-      setRefreshing(false);
-    }
-  }
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -212,14 +245,27 @@ function ShopView({
             View my shop ↗
           </a>
           <button
-            onClick={refresh}
-            disabled={refreshing}
+            onClick={onRefresh}
+            disabled={refreshing || drafting}
             className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-white dark:text-black"
           >
             {refreshing ? "Refreshing…" : "↻ Refresh videos"}
           </button>
         </div>
       </div>
+
+      {/* AI status banners */}
+      {drafting && (
+        <p className="mt-6 flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-3 text-sm text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="animate-pulse">✨</span> AI is drafting your products — names, descriptions, and prices it can read…
+        </p>
+      )}
+      {aiPaused && !drafting && (
+        <p className="mt-6 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          AI drafting paused — today&apos;s image-reading limit was reached. Un-drafted items can be
+          filled in manually, or enable Gemini billing to lift the limit.
+        </p>
+      )}
 
       {/* Products */}
       <div className="mt-8 mb-4 flex items-baseline justify-between">

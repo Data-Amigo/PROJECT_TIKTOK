@@ -56,6 +56,15 @@ class ProductOut(BaseModel):
     created_at: datetime
 
 
+class AutodraftOut(BaseModel):
+    """Result of the batch auto-draft. `ai_paused` is True when the AI usage
+    cap stopped the run partway — the UI shows a calm banner and the un-drafted
+    products keep a manual fallback."""
+
+    products: list["ProductOut"]
+    ai_paused: bool = False
+
+
 class AutofillOut(BaseModel):
     """Result of running the vision draft agent on one product. The product is
     now filled with a suggested name/description. The rest are SUGGESTIONS for
