@@ -310,3 +310,28 @@ def test_shop_chat_rejects_non_user_first_message(client, db_session):
 def test_shop_chat_unknown_shop_is_404(client):
     r = client.post("/api/pages/nobody/chat", json={"messages": [{"role": "user", "content": "hi"}]})
     assert r.status_code == 404
+
+
+def test_system_prompt_grounds_and_guards():
+    """The prompt (where the conversational intelligence lives) must: inject the
+    live catalogue as the source of truth, decode Sheng, forbid inventing
+    colours/sizes, and forbid formal textbook Swahili. No OpenAI call — this
+    asserts the guardrail text itself, deterministically."""
+    from app.agent import sales
+
+    catalogue = [
+        sales.CatalogueItem(name="Ripped Jeans", price_kes=600, available=False, description="denim"),
+        sales.CatalogueItem(name="Ladies Jeans", price_kes=550, available=True, description="slim fit"),
+    ]
+    prompt = sales._system_prompt("Classy Closet", catalogue, featured=None)
+
+    # Source of truth: the real catalogue (name + price + stock state) is injected.
+    assert "Ripped Jeans" in prompt and "KES 600" in prompt and "SOLD OUT" in prompt
+    assert "Ladies Jeans" in prompt and "in stock" in prompt
+    # Comprehension: it teaches the model to decode Sheng intent.
+    assert "nadai" in prompt and "bei?" in prompt
+    # Honesty rail: never invent a colour/size, never pitch sold-out stock.
+    assert "you do NOT track colours or sizes" in prompt
+    assert "SOLD OUT = cannot be bought now" in prompt
+    # Voice rail: no formal textbook Swahili; mirror the customer.
+    assert "textbook Swahili" in prompt
