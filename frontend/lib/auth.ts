@@ -1,16 +1,12 @@
 /**
- * Auth client — signup / login / who-am-I, plus token storage.
+ * Auth client — signup / login / who-am-I.
  *
- * The JWT from the backend is kept in localStorage and sent as
- * `Authorization: Bearer <token>` on protected calls. (localStorage is the
- * pragmatic choice for a pilot SPA; a stricter httpOnly-cookie setup is a noted
- * hardening step for later — see the workplan.) All token handling lives HERE
- * so no component touches localStorage directly.
+ * Token storage + authHeader live in lib/api.ts (so api.ts can attach auth
+ * without importing this file — avoids a circular import). This module owns
+ * the account-identity calls and re-exports the logout helper.
  */
 
-import { API_URL, throwOnError } from "@/lib/api";
-
-const TOKEN_KEY = "sokolink_token";
+import { API_URL, clearToken, getToken, setToken, throwOnError } from "@/lib/api";
 
 export type Account = {
   id: number;
@@ -20,25 +16,6 @@ export type Account = {
   created_at: string;
 };
 
-// ── Token storage (guarded for SSR — window is undefined on the server) ─────
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
-function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-export function clearToken(): void {
-  if (typeof window !== "undefined") localStorage.removeItem(TOKEN_KEY);
-}
-
-/** Authorization header for protected requests, or {} when logged out. */
-export function authHeader(): Record<string, string> {
-  const t = getToken();
-  return t ? { Authorization: `Bearer ${t}` } : {};
-}
-
-// ── Calls ───────────────────────────────────────────────────────────────────
 export async function signup(input: {
   name: string;
   email: string;
@@ -64,8 +41,8 @@ export async function login(email: string, password: string): Promise<void> {
   setToken(data.access_token);
 }
 
-/** The logged-in account, or null if not authenticated. Clears a dead token
- *  (expired/invalid) so the app cleanly falls back to logged-out. */
+/** The logged-in account, or null. Clears a dead token so the app falls back
+ *  cleanly to logged-out. */
 export async function fetchMe(): Promise<Account | null> {
   const token = getToken();
   if (!token) return null;

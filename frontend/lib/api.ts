@@ -13,6 +13,27 @@
 // build time (NEXT_PUBLIC_); on the server it's a normal env read.
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8100";
 
+// ── Token storage (the auth layer both api.ts and auth.ts build on) ─────────
+// Kept here (not auth.ts) so api.ts can attach auth headers without importing
+// auth.ts — that would be a circular import. Guarded for SSR (no window).
+const TOKEN_KEY = "sokolink_token";
+
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+export function clearToken(): void {
+  if (typeof window !== "undefined") localStorage.removeItem(TOKEN_KEY);
+}
+/** Authorization header for protected requests, or {} when logged out. */
+export function authHeader(): Record<string, string> {
+  const t = getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
 // ── Types (mirror of the pydantic *Out schemas) ────────────────────────────
 export type ProductStatus = "draft" | "published";
 
@@ -56,6 +77,17 @@ export type PublicPage = {
   display_name: string;
   avatar_url: string | null;
   products: PublicProduct[];
+};
+
+/** The seller's own storefront — mirrors StorefrontOut. */
+export type Storefront = {
+  handle: string;
+  display_name: string;
+  tiktok_username: string | null;
+  bio: string;
+  avatar_url: string | null;
+  follower_count: number;
+  phone: string | null;
 };
 
 /** Fields a PATCH may change — mirrors ProductUpdateIn (all optional). */
@@ -112,21 +144,46 @@ export function coverSrc(cover_url: string | null): string | null {
   return cover_url ? `${API_URL}/media/${cover_url}` : null;
 }
 
-// ── Seller endpoints (the dashboard) ───────────────────────────────────────
+// ── Seller endpoints (all require login → authHeader) ──────────────────────
 
-/** Paste a TikTok handle → scrape recent videos into DRAFT products. */
-export async function ingestProducts(handle: string, limit = 6): Promise<Product[]> {
-  const res = await fetch(`${API_URL}/api/products/ingest`, {
+/** Connect a TikTok username → build the storefront + pull recent videos. */
+export async function connectTikTok(username: string): Promise<Storefront> {
+  const res = await fetch(`${API_URL}/api/account/connect-tiktok`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ handle, limit }),
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify({ username }),
+  });
+  return (await throwOnError(res)).json();
+}
+
+/** The account's storefront, or null if TikTok isn't connected yet. */
+export async function fetchStorefront(): Promise<Storefront | null> {
+  const res = await fetch(`${API_URL}/api/account/storefront`, { headers: authHeader() });
+  if (!res.ok) return null;
+  return res.json(); // backend returns null (not 404) when not connected
+}
+
+/** The seller's own products (drafts + published). */
+export async function fetchMyProducts(): Promise<Product[]> {
+  const res = await fetch(`${API_URL}/api/products/mine`, { headers: authHeader() });
+  return (await throwOnError(res)).json();
+}
+
+/** Re-pull the connected TikTok's latest videos into draft products. */
+export async function refreshProducts(): Promise<Product[]> {
+  const res = await fetch(`${API_URL}/api/products/refresh`, {
+    method: "POST",
+    headers: authHeader(),
   });
   return (await throwOnError(res)).json();
 }
 
 /** Run the 🤖 vision agent on one product (fills name + description). */
 export async function autofillProduct(id: number): Promise<AutofillResult> {
-  const res = await fetch(`${API_URL}/api/products/${id}/autofill`, { method: "POST" });
+  const res = await fetch(`${API_URL}/api/products/${id}/autofill`, {
+    method: "POST",
+    headers: authHeader(),
+  });
   return (await throwOnError(res)).json();
 }
 
@@ -134,7 +191,7 @@ export async function autofillProduct(id: number): Promise<AutofillResult> {
 export async function updateProduct(id: number, changes: ProductUpdate): Promise<Product> {
   const res = await fetch(`${API_URL}/api/products/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify(changes),
   });
   return (await throwOnError(res)).json();

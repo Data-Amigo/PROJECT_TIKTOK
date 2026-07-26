@@ -12,7 +12,7 @@ buyer-facing page can never accidentally leak an email or a password hash.
 from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
@@ -42,6 +42,12 @@ class Account(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # The account's one storefront (created when they connect TikTok). None
+    # until then. uselist=False makes it a 1-to-1, not a list.
+    seller = relationship(
+        "Seller", back_populates="account", uselist=False, cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:  # never include the hash in logs

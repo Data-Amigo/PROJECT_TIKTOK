@@ -18,10 +18,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agent import draft as draft_agent
+from app.models.account import Account
 from app.models.product import Product, ProductStatus
 from app.models.seller import Seller
 from app.schemas.product import ProductUpdateIn
-from app.services import scraper
 
 
 class ProductError(Exception):
@@ -29,65 +29,30 @@ class ProductError(Exception):
     message — safe to show a human."""
 
 
-# ── Ingest: scrape a seller's videos into DRAFT products ──────────────────────
-def ingest_seller_videos(db: Session, handle: str, limit: int = 6) -> list[Product]:
-    """Scrape recent videos and store them as DRAFT products (no AI, no money).
-
-    IDEMPOTENT by tiktok_video_id: paste the same handle twice and existing
-    rows are refreshed, never duplicated — the DB's UNIQUE(tiktok_video_id)
-    is the ultimate guard; we check first only to update instead of erroring.
-
-    Deliberately does NOT run the vision agent here — drafting is expensive, so
-    it's its own on-demand step (autofill_product). Ingest stays fast and cheap.
-    """
-    videos = scraper.fetch_profile(handle, limit=limit)  # may raise ScraperError
-
-    # One seller per TikTok account (Seller.tiktok_username is UNIQUE). Find or
-    # create them from the scraped author metadata.
-    author = videos[0].authorMeta
-    seller = db.scalar(select(Seller).where(Seller.tiktok_username == author.name))
+# ── Ownership (the account-scoping boundary) ──────────────────────────────────
+def list_account_products(db: Session, account: Account) -> list[Product]:
+    """Every product belonging to the account's storefront (drafts + published),
+    newest first — what the dashboard loads on open. Empty if not connected."""
+    seller = db.scalar(select(Seller).where(Seller.account_id == account.id))
     if seller is None:
-        seller = Seller(
-            handle=author.name,                 # sokolink/<handle>; seller can rename later
-            display_name=author.nickName or author.name,
-            tiktok_username=author.name,
-            bio=author.signature,               # raw bio — holds addresses/phones (spike 00)
-        )
-        db.add(seller)
-        db.flush()  # assign seller.id before we attach products to it
+        return []
+    return sorted(seller.products, key=lambda p: p.created_at, reverse=True)
 
-    products: list[Product] = []
-    for v in videos:
-        product = db.scalar(
-            select(Product).where(Product.tiktok_video_id == v.id)
-        )
-        if product is None:
-            product = Product(tiktok_video_id=v.id, seller_id=seller.id)
-            db.add(product)
 
-        # Refresh scrape-sourced fields on every ingest (source data can change;
-        # our copy should track it). Never touch name/description/price/stock —
-        # those are seller-owned once set.
-        product.video_url = v.webVideoUrl
-        product.caption = v.text
-        product.hashtags = v.hashtags
-        # Store OUR copy of the cover (TikTok URLs expire). Best-effort: a cover
-        # download failure must not sink the whole ingest.
-        try:
-            product.cover_url = scraper.save_cover(v)
-        except scraper.ScraperError:
-            product.cover_url = product.cover_url  # keep any prior copy; leave as-is
-
-        products.append(product)
-
-    db.commit()
-    for p in products:
-        db.refresh(p)
-    return products
+def _owned_product(db: Session, account: Account, product_id: int) -> Product:
+    """Fetch a product ONLY if it belongs to this account's storefront.
+    A product the caller doesn't own reads exactly like one that doesn't exist
+    (same not-found) — we never reveal other sellers' product ids."""
+    product = db.get(Product, product_id)
+    if product is None or product.seller is None or product.seller.account_id != account.id:
+        raise ProductError(f"Product {product_id} not found.")
+    return product
 
 
 # ── Autofill: run the vision draft agent on ONE product (the 🤖 step) ─────────
-def autofill_product(db: Session, product_id: int) -> tuple[Product, "draft_agent.ProductDraft"]:
+def autofill_product(
+    db: Session, account: Account, product_id: int
+) -> tuple[Product, "draft_agent.ProductDraft"]:
     """Draft one product from its stored cover image.
 
     Returns (product, draft). We persist ONLY name + description onto the
@@ -96,9 +61,7 @@ def autofill_product(db: Session, product_id: int) -> tuple[Product, "draft_agen
     product.price_kes here — the seller's PATCH remains the only writer of the
     stored price (CONCEPTS §4). Stock is likewise untouched.
     """
-    product = db.get(Product, product_id)
-    if product is None:
-        raise ProductError(f"Product {product_id} not found.")
+    product = _owned_product(db, account, product_id)
 
     # Read OUR stored cover bytes (never a live TikTok URL — expired by now).
     cover_bytes = _read_cover_bytes(product)
@@ -133,12 +96,13 @@ def _read_cover_bytes(product: Product) -> bytes | None:
 
 
 # ── Update: seller confirms — set words, set money, maybe publish ─────────────
-def update_product(db: Session, product_id: int, changes: ProductUpdateIn) -> Product:
-    """Apply a seller's edits. This is the DETERMINISTIC money path — the only
-    place price/stock/status change, driven by the human, tested to the hilt."""
-    product = db.get(Product, product_id)
-    if product is None:
-        raise ProductError(f"Product {product_id} not found.")
+def update_product(
+    db: Session, account: Account, product_id: int, changes: ProductUpdateIn
+) -> Product:
+    """Apply a seller's edits to THEIR OWN product. This is the DETERMINISTIC
+    money path — the only place price/stock/status change, driven by the human,
+    scoped to the owner, tested to the hilt."""
+    product = _owned_product(db, account, product_id)
 
     if changes.name is not None:
         product.name = changes.name

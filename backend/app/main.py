@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from app.api import account as account_api
 from app.api import auth as auth_api
 from app.api import products as products_api
 from app.config import settings
@@ -60,6 +61,7 @@ app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
 # ── ROUTERS ───────────────────────────────────────────────────────────────────
 # Each resource area is its own router in api/; main just registers them.
 app.include_router(auth_api.router)            # /api/auth/*      (accounts)
+app.include_router(account_api.router)         # /api/account/*   (storefront)
 app.include_router(products_api.router)        # /api/products/*  (seller)
 app.include_router(products_api.pages_router)  # /api/pages/*     (buyer)
 

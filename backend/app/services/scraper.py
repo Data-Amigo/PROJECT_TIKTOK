@@ -148,6 +148,24 @@ def fetch_profile(username: str, limit: int = 10) -> list[TikTokVideo]:
     return videos
 
 
+def save_avatar(username: str, url: str | None) -> str | None:
+    """Download OUR copy of a seller's TikTok avatar; return its relative path.
+    Same expiring-CDN rule as covers — store our own. Named by username
+    (idempotent). Returns None when there's no avatar."""
+    if not url:
+        return None
+    avatar_dir = MEDIA_DIR.parent / "avatars"
+    avatar_dir.mkdir(parents=True, exist_ok=True)
+    dest = avatar_dir / f"{username}.jpg"
+    try:
+        resp = httpx.get(url, timeout=DOWNLOAD_TIMEOUT_S)
+        resp.raise_for_status()
+        dest.write_bytes(resp.content)
+    except httpx.HTTPError as e:
+        raise ScraperError(f"Avatar download failed for @{username}: {e}") from e
+    return f"avatars/{username}.jpg"
+
+
 def save_cover(video: TikTokVideo) -> str | None:
     """Download OUR copy of the cover image; return its relative path.
 
