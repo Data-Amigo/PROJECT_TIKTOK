@@ -76,6 +76,29 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
 
+    # ── M-Pesa (Daraja) — M4 payment rails ──
+    # From the Safaricom Daraja portal app. Empty defaults so a fresh clone still
+    # boots; services/mpesa.py checks them at CALL time with a human message.
+    # SANDBOX shared test values: shortcode 174379 + the public sandbox passkey.
+    mpesa_consumer_key: str = ""
+    mpesa_consumer_secret: str = ""
+    mpesa_shortcode: str = ""          # 174379 in sandbox; your Paybill/Till in prod
+    mpesa_passkey: str = ""            # Lipa Na M-Pesa Online passkey
+    mpesa_env: str = "sandbox"        # "sandbox" | "production" — picks the base URL
+    # Where Safaricom POSTs the payment result. Public HTTPS only (a tunnel in
+    # dev). "callback = truth": we mark an order paid ONLY from this, never by
+    # assuming the STK succeeded. Set when the tunnel/deploy exists.
+    mpesa_callback_url: str = ""
+
+    @property
+    def mpesa_base_url(self) -> str:
+        """Daraja's host differs by environment — one place decides which."""
+        return (
+            "https://api.safaricom.co.ke"
+            if self.mpesa_env.strip().lower() == "production"
+            else "https://sandbox.safaricom.co.ke"
+        )
+
     # REQUIRED (no default): the app refuses to boot without a database.
     # Points at SokoLink's OWN Railway Postgres — never a shared one. We learned
     # this the concrete way: the first URL we tried held 28 tables from two
