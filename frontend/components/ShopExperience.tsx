@@ -64,8 +64,14 @@ export function ShopExperience({
         {/* Product-from-video hero */}
         {featured && <FeaturedHero product={featured} />}
 
-        {/* AI chat */}
-        <ShopChat handle={shop.handle} featured={featured} videoId={featuredVideoId} />
+        {/* Chat — presented as the shop itself (avatar + name), not a "bot" */}
+        <ShopChat
+          handle={shop.handle}
+          shopName={shop.display_name}
+          avatar={avatar}
+          featured={featured}
+          videoId={featuredVideoId}
+        />
 
         {/* Browse all */}
         <button
@@ -77,7 +83,7 @@ export function ShopExperience({
 
         <footer className="mt-10 border-t border-zinc-200 pt-6 text-center dark:border-zinc-800">
           <p className="text-xs text-zinc-400">
-            Powered by <span className="font-semibold text-zinc-600 dark:text-zinc-300">SokoLink</span>{" "}
+            Powered by <span className="font-semibold text-zinc-600 dark:text-zinc-300">Bonga na Bob</span>{" "}
             · Where your audience becomes your customers
           </p>
         </footer>
@@ -132,16 +138,20 @@ function FeaturedHero({ product }: { product: PublicProduct }) {
 // ── AI chat ──────────────────────────────────────────────────────────────────
 function ShopChat({
   handle,
+  shopName,
+  avatar,
   featured,
   videoId,
 }: {
   handle: string;
+  shopName: string;
+  avatar: string | null;
   featured: PublicProduct | null;
   videoId: string | null;
 }) {
   const greeting = featured
     ? `Hi 👋 You're looking at the ${featured.name} — how can I help?`
-    : `Hi 👋 Welcome! Ask me anything, or tell me what you're looking for.`;
+    : `Hi 👋 Karibu! Ask me anything, or tell me what you're looking for.`;
 
   // messages[0] is the static greeting (shown, not sent). The API gets the rest.
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: greeting }]);
@@ -172,7 +182,25 @@ function ShopChat({
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="mb-1 px-1 text-xs font-medium text-zinc-400">🤖 Shop assistant</div>
+      {/* Chat identity: the shop itself — its avatar + name, presented as a real
+          person on chat (an "online" dot), never a robot/"assistant" badge. */}
+      <div className="mb-2 flex items-center gap-2 border-b border-zinc-100 px-1 pb-2 dark:border-zinc-800">
+        <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+          {avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatar} alt={shopName} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-sm font-bold text-zinc-500">
+              {shopName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-zinc-900" />
+        </div>
+        <div className="leading-tight">
+          <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{shopName}</div>
+          <div className="text-[11px] text-emerald-600">online now</div>
+        </div>
+      </div>
       <div className="flex max-h-80 flex-col gap-2 overflow-y-auto px-1 py-2">
         {messages.map((m, i) => (
           <Bubble key={i} role={m.role} text={m.content} />

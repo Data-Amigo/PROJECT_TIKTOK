@@ -5,9 +5,9 @@ Draft agent 🤖 — a cover image becomes a product draft. (Session 1.2, part 2
                                           structured output   {name, description, price?…}
                                                               seller CONFIRMS; publish = human gate
 
-WHY OpenAI here (and Anthropic reserved for the customer chat, M5): Fredrick has
-OpenAI billing available now, so we use GPT vision for extraction instead of
-Gemini's capped free tier. THIS FILE is the only place that knows which vision
+WHY OpenAI here: Fredrick has OpenAI billing, so we use GPT vision for extraction
+instead of Gemini's capped free tier. (OpenAI now runs the customer sales chat
+too — see agent/sales.py.) THIS FILE is the only place that knows which vision
 provider we use — callers just see draft_from_video(). Swapping the model or the
 whole provider is a change here and nowhere else (the adapter pattern).
 
