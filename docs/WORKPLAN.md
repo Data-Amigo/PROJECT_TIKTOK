@@ -364,6 +364,43 @@ before agent) and **Gemini/LLM billing** enabled.
 
 ---
 
+## M8 — Seller analytics & insights  `branch: m8-analytics`  *(planned — seller ask 2026-07-26)*
+
+*Goal: a simple seller dashboard with three places — **Products**, **Analytics**,
+**Customers** — that answer "how are my videos doing?" and "what do people
+actually want?" Kept deliberately lean (not the busy reference dashboard).*
+
+**What data we ACTUALLY have (verified against the raw Apify payload, `spikes/out/raw_item_00.json`):**
+
+| Seller wants | Reality | Source |
+|---|---|---|
+| Traction per video (views) | ✅ in the scrape, just not stored | `playCount` (e.g. 1718) |
+| Number of comments per video | ✅ in the scrape, just not stored | `commentCount` (also `diggCount` likes, `shareCount`, `collectCount` saves) |
+| **What people are asking for** | ⚠️ must instrument — richer from OUR chat than TikTok | persist sales-chat questions (goldmine); OR pay for TikTok comment TEXT (`commentsPerPost>0`, costs more) |
+| Clicks on the SokoLink link / asked directly | ⚠️ must instrument (only WE can see this) | log page views, `?v=` opens, paste-link resolves, chat opens |
+| Shop location in Nairobi (for directions) | ❌ TikTok has NO structured location | **seller-entered** profile field; AI can pre-fill from the bio (`signature` holds addresses — spike 00) |
+
+**Phase A — start the data flywheel (do EARLY, cheap, no UI). "When the data comes we're ready" means capturing NOW so history exists to show later:**
+- [ ] **8.1 Capture video metrics** — widen `TikTokVideo` schema + add `views/likes/comments/shares/saves` columns on `Product` (migration); store on every scrape. Zero extra Apify cost (already in the payload).
+- [ ] **8.2 Event log** — a lightweight `Event` table: `page_view`, `video_open` (`?v=`), `link_resolve` (paste), `chat_open`, `chat_query`. Fire-and-forget from the public routes.
+- [ ] **8.3 Persist buyer questions** — log each sales-chat user message (shop, video, text, ts). This is the "what people want" goldmine — our own data, richer than TikTok comments.
+- [ ] **8.4 Shop location + hours** — seller-entered fields on the storefront profile (independently shippable; also feeds M4 checkout directions). Optional AI pre-fill from bio.
+
+**Phase B — surface it (when there's data worth showing):**
+- [ ] **8.5 Analytics tab** — per-video traction (views/likes/comments), SokoLink link clicks, # chats, **top asked-for products** + demand for sold-out items (restock signal).
+- [ ] **8.6 Customers tab** — who engaged (from chats/orders once M4 lands) + a "what people are asking" digest.
+
+**Optional:** fetch TikTok comment TEXT (`commentsPerPost>0`) to mine questions from the comments themselves — only if chat-question mining isn't enough (has per-scrape cost).
+
+*You learn:* an analytics event pipeline, aggregation queries, and the product
+lesson that **the most valuable data is the data you instrument yourself** (the
+chat), not what the platform hands you.
+
+**Done when:** a seller can open Analytics and see real numbers for her own videos
+and a ranked list of what buyers keep asking for.
+
+---
+
 ## The agentic learning arc (where the 🤖 lives)
 
 | Session | Agent concept |
@@ -400,3 +437,5 @@ first on purpose.
 | 2026-07-25 | Rebrand: BOB → **SokoLink**, slogan "Where your audience becomes your customers." (23 files, verified live) |
 | 2026-07-26 | M2.2/2.3 Connect TikTok + account-scoped storefront — Seller↔Account 1-1, connect auto-fills profile + pulls videos, product endpoints login-gated + ownership-checked, redesigned dashboard (connect ↔ storefront). 72 green, live end to end. **M2 done-when met** → merge to main |
 | 2026-07-26 | **Auto-drafting** (seller feedback: "don't make me click auto-fill"). Products auto-draft on connect/refresh (name/desc + a readable price → DRAFT price; publish stays the human gate — guardrail v3, CONCEPTS §4). Graceful AI-cap pause + manual fallback. Auth tests randomized (collision-proof). 75 green. **Gemini billing is the gate for auto-draft + the M5 agent.** M5 reshaped into the context-aware AI sales agent (Video→Agent→Catalogue→Checkout, per-video `?v=` links, bottom-sheet catalogue) per seller's vision |
+| 2026-07-26 | M5.1 AI sales chat live (context injection, not RAG) — human persona (shop avatar/name, no bot badge), grounded rails (no invented colour/size/stock, sold-out honesty, Sheng comprehension). M5.2 paste-a-TikTok-link → feature the product (TikTok gives no per-video link/referrer; SSRF-guarded short-link resolve). Provider swung Anthropic→OpenAI→**Gemini** (paid, best at Swahili/Sheng) through the one-file agent seam. 91 green |
+| 2026-07-26 | **M8 planned** (seller ask): analytics + customers tabs. Verified against raw Apify payload — views/likes/**comment count** are in the scrape (not yet stored); location is NOT (seller-entered, AI-prefill from bio); "what people ask for" + link clicks must be **instrumented** (persist chat questions + event log). Decision: **start capturing early** (Phase A flywheel) so data exists when we build the views (Phase B) |
