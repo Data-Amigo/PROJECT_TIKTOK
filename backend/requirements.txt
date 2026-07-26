@@ -16,6 +16,10 @@ sqlalchemy==2.0.51
 psycopg[binary]==3.3.4           # the actual Postgres driver (binary = no compiler needed)
 alembic==1.18.5                  # schema migrations (backend/alembic/)
 
+# ── AI (vision draft agent) ───────────────────────────────
+openai==2.48.0                   # GPT vision + structured outputs (product drafts)
+# google-genai kept installed as an optional legacy vision provider
+
 # ── Auth ──────────────────────────────────────────────────
 argon2-cffi==25.1.0              # Argon2id password hashing (OWASP-recommended)
 PyJWT==2.13.0                    # signed JWT access tokens

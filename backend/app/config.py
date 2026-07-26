@@ -64,11 +64,18 @@ class Settings(BaseSettings):
     # and fails with a human message, same pattern as the spike.
     apify_api_token: str = ""
 
-    # Gemini powers the vision DRAFT agent (M1.2). Chosen over Anthropic for
-    # this task because it reads Sheng/Swahili in-video text better (tested on
-    # real seller content). Anthropic stays the choice for conversation later.
+    # OpenAI powers the vision DRAFT agent (2026-07-26): we have OpenAI billing,
+    # so GPT vision replaces Gemini's capped free tier for product extraction.
+    # Anthropic stays reserved for the customer conversation agent (M5).
     # Checked at call time, not boot, so a fresh clone still starts.
+    openai_api_key: str = ""
+
+    # Legacy / optional: Gemini was the earlier vision provider. Kept so the
+    # draft agent can be swapped back with a one-line change if desired.
     gemini_api_key: str = ""
+
+    # Reserved for the M5 customer chat agent (not used yet).
+    anthropic_api_key: str = ""
 
     # REQUIRED (no default): the app refuses to boot without a database.
     # Points at SokoLink's OWN Railway Postgres — never a shared one. We learned

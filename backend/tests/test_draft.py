@@ -46,6 +46,6 @@ def test_missing_key_raises_clean_error(monkeypatch):
     """With no API key, fail with instructions — same POC bar as everywhere."""
     from app import config
 
-    monkeypatch.setattr(config.settings, "gemini_api_key", "")
-    with pytest.raises(DraftError, match="GEMINI_API_KEY"):
+    monkeypatch.setattr(config.settings, "openai_api_key", "")
+    with pytest.raises(DraftError, match="OPENAI_API_KEY"):
         draft_from_video(cover_bytes=b"fake-image-bytes")

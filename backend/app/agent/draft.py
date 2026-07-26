@@ -1,14 +1,15 @@
 """
 Draft agent 🤖 — a cover image becomes a product draft. (Session 1.2, part 2)
 
-    cover image + caption + hashtags ──> Gemini (vision) ──> ProductDraft
-                                          structured output   {name, description, tags}
-                                                              seller CONFIRMS; never price/stock
+    cover image + caption + hashtags ──> OpenAI (vision) ──> ProductDraft
+                                          structured output   {name, description, price?…}
+                                                              seller CONFIRMS; publish = human gate
 
-WHY Gemini here (and Anthropic elsewhere): Fredrick tested both on real Kenyan
-seller content and Gemini reads Sheng/Swahili in-video text noticeably better.
-This file is the ONLY place that knows that — callers see draft_from_video().
-Swap the model, or swap Gemini for another engine, and nothing upstream changes.
+WHY OpenAI here (and Anthropic reserved for the customer chat, M5): Fredrick has
+OpenAI billing available now, so we use GPT vision for extraction instead of
+Gemini's capped free tier. THIS FILE is the only place that knows which vision
+provider we use — callers just see draft_from_video(). Swapping the model or the
+whole provider is a change here and nowhere else (the adapter pattern).
 
 TWO lessons this file teaches — the heart of safe LLM integration:
 
@@ -17,29 +18,29 @@ TWO lessons this file teaches — the heart of safe LLM integration:
      shape — no prose, no "```json" fences, no missing keys. Parsing hope is
      replaced by a guarantee.
 
-  2. THE AGENT PROPOSES, CODE DISPOSES. ProductDraft has NO price and NO stock
-     field — by construction the model cannot set them. It drafts words; the
-     seller sets money with one tap; the DB constraint from 1.1 is the backstop.
-     An LLM misreading "bei 800" must never be able to publish a price.
+  2. THE AGENT PROPOSES, CODE DISPOSES. The AI drafts words and a price it can
+     READ off the image — but a product is never LIVE until the seller hits
+     Publish (which still requires a price). The AI removes typing; it can't
+     sell anything at an unconfirmed price. See CONCEPTS §4.
 """
 
-from google import genai
-from google.genai import types
+import base64
+
+from openai import OpenAI, RateLimitError
 from pydantic import BaseModel, Field
 
 from app.config import settings
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-# gemini-3.6-flash: current flash tier — cheap, fast, strong multilingual
-# vision, supports the structured-output constraint below. (2.5-flash is now
-# blocked for new API users, so we're on the current line — this is exactly
-# the one-line swap this constant exists for.)
-MODEL = "gemini-3.6-flash"
+# gpt-4o-mini: cheap, fast, vision-capable, supports the structured-output
+# constraint below, and strong enough at OCR + multilingual (Sheng/Swahili) for
+# reading a product + a printed price. Bump to gpt-4o (or a gpt-5 mini) here if
+# quality needs it — this one constant is the whole model choice.
+MODEL = "gpt-4o-mini"
 
-# Low temperature: this is extraction, not creative writing. We want the same
-# image to yield the same draft, and we want it to describe what it SEES, not
-# invent flattering copy.
-TEMPERATURE = 0.2
+# Low temperature: this is extraction, not creative writing. Same image →
+# same draft; describe what's SEEN, don't invent flattering copy.
+TEMPERATURE = 0
 
 
 class DraftError(Exception):
@@ -47,21 +48,19 @@ class DraftError(Exception):
 
 
 class DraftQuotaError(DraftError):
-    """The vision model hit its usage cap (HTTP 429). Distinct so the API can
-    return 429 (Too Many Requests) and the UI can say 'try later', not 'broken'."""
+    """The vision model hit its usage/billing cap (HTTP 429). Distinct so the
+    API can return 429 and the UI can say 'try later', not 'broken'."""
 
 
 # ── OUTPUT SCHEMA (the guarantee + the guardrail) ─────────────────────────────
 class ProductDraft(BaseModel):
     """What the agent is ALLOWED to produce.
 
-    The guardrail EVOLVED (see CONCEPTS.md §4): the agent may now SUGGEST a
-    price — but only one it can literally SEE printed on the image ("600 ksh").
-    That suggestion only PRE-FILLS the seller's price box; it is never written
-    to the stored/published price. The seller, looking at the same picture,
-    confirms it. So the human is still the one who sets money — we just stop
-    making them retype what's on the photo. There is deliberately NO `stock`
-    field: stock is never something a picture can tell us.
+    The agent drafts name/description/tags and may fill `suggested_price_kes`
+    ONLY from a price it can literally SEE ("600 ksh"). That becomes a DRAFT
+    price; going live is always the seller's explicit Publish (CONCEPTS §4).
+    There is deliberately NO `stock` field: stock is never something a picture
+    can tell us.
     """
 
     is_product: bool = Field(
@@ -89,8 +88,6 @@ class ProductDraft(BaseModel):
 
 # ── PROMPT ────────────────────────────────────────────────────────────────────
 # Kept as a constant so it's reviewable and diffable — prompts are code.
-# Note the explicit "do NOT guess price" line: defense in depth even though the
-# schema already makes price impossible.
 SYSTEM_INSTRUCTION = """You turn a Kenyan social-commerce seller's TikTok video \
 cover image into a clean product draft.
 
@@ -125,81 +122,86 @@ def draft_from_video(
 
     `cover_bytes` is OUR stored copy of the image (never a live TikTok URL —
     those expire; see scraper.save_cover). Returns a validated ProductDraft the
-    seller will confirm and price. Raises DraftError on any failure — the UI
-    shows the seller a "couldn't read that, try again", never a stack trace.
+    seller will confirm. Raises DraftError on any failure — the UI shows the
+    seller a plain message, never a stack trace.
     """
-    if not settings.gemini_api_key:
-        raise DraftError("GEMINI_API_KEY is not set — add it to .env (see .env.example).")
+    if not settings.openai_api_key:
+        raise DraftError("OPENAI_API_KEY is not set — add it to .env (see .env.example).")
     if cover_bytes is None:
-        # No image = nothing to look at. The scraper returns None covers as
-        # data, so this is an expected branch, not a crash.
         raise DraftError("No cover image to draft from.")
 
     hashtags = hashtags or []
     # The text hints go in the user turn; the image is the star. Hashtags are
-    # labelled as weak on purpose so the model doesn't over-trust them.
+    # labelled weak on purpose so the model doesn't over-trust them.
     user_text = (
         f"Caption (mostly hashtags, low value): {caption!r}\n"
         f"Hashtags (weak category hints): {', '.join(hashtags) or 'none'}\n"
-        "Draft the product from the cover image above."
+        "Draft the product from the cover image."
     )
+    b64 = base64.b64encode(cover_bytes).decode("ascii")
 
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = OpenAI(api_key=settings.openai_api_key)
     try:
-        resp = client.models.generate_content(
+        completion = _parse(
+            client,
             model=MODEL,
-            contents=[
-                types.Part.from_bytes(data=cover_bytes, mime_type="image/jpeg"),
-                user_text,
+            temperature=TEMPERATURE,
+            messages=[
+                {"role": "system", "content": SYSTEM_INSTRUCTION},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_text},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+                    ],
+                },
             ],
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                temperature=TEMPERATURE,
-                # THIS pair is the structured-output guarantee: the response is
-                # constrained to valid JSON matching ProductDraft. resp.parsed
-                # then hands us a real ProductDraft, already validated.
-                response_mime_type="application/json",
-                response_schema=ProductDraft,
-            ),
+            # Structured output: the response is CONSTRAINED to ProductDraft's
+            # schema; `.parsed` hands back a validated ProductDraft.
+            response_format=ProductDraft,
         )
+    except RateLimitError as e:
+        # 429 — rate limit or exhausted billing. One friendly message for both.
+        raise DraftQuotaError(
+            "The image reader has reached its usage limit. Try again shortly, or "
+            "check the OpenAI billing. You can still fill in the details by hand."
+        ) from e
     except Exception as e:
-        # Classify so callers can react correctly and sellers see plain language.
-        # The raw google-genai error is a wall of JSON — never show it to a seller.
-        msg = str(e)
-        code = getattr(e, "code", None)
-        if code == 429 or "RESOURCE_EXHAUSTED" in msg or "429" in msg:
-            raise DraftQuotaError(
-                "The image reader has reached today's usage limit. "
-                "Try again later, or ask the owner to raise the AI quota. "
-                "You can still fill in the details by hand."
-            ) from e
         raise DraftError(
             "Couldn't read this image automatically — please fill in the details manually."
         ) from e
 
-    draft = resp.parsed
+    message = completion.choices[0].message
+    if getattr(message, "refusal", None):
+        raise DraftError("The image reader declined to read this image.")
+    draft = message.parsed
     if not isinstance(draft, ProductDraft):
-        # Extremely rare with structured output, but never trust — validate.
-        raise DraftError("Gemini returned an unparseable draft.")
+        raise DraftError("The image reader returned an unparseable draft.")
     return draft
+
+
+def _parse(client: OpenAI, **kwargs):
+    """Call the structured-output parse helper, whichever path this SDK exposes
+    (it moved out of the `beta` namespace across versions — support both)."""
+    parse = getattr(client.chat.completions, "parse", None)
+    if parse is not None:
+        return parse(**kwargs)
+    return client.beta.chat.completions.parse(**kwargs)
 
 
 # ── SMOKE TEST ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    # Live check against a real stored cover. Run AFTER the scraper has saved
-    # one (or point at spike 00's cover). Costs a fraction of a shilling.
     #   backend/.venv/Scripts/python -m app.agent.draft
     import sys
     from pathlib import Path
 
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # emojis in captions
 
-    # Reuse spike 00's downloaded cover if present.
     sample = Path(__file__).resolve().parents[2] / "spikes" / "out" / "cover_00.jpg"
     if not sample.exists():
         sys.exit(f"No sample cover at {sample} — run spike 00 first.")
 
-    print(f"Drafting from {sample.name} ...")
+    print(f"Drafting from {sample.name} with {MODEL} ...")
     d = draft_from_video(
         cover_bytes=sample.read_bytes(),
         caption="#kenyantiktok #duvets #fypp",
