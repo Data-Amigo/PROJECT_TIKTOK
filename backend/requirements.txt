@@ -16,9 +16,10 @@ sqlalchemy==2.0.51
 psycopg[binary]==3.3.4           # the actual Postgres driver (binary = no compiler needed)
 alembic==1.18.5                  # schema migrations (backend/alembic/)
 
-# ── AI (both agents run on OpenAI) ────────────────────────
-openai==2.48.0                   # GPT vision (product drafts) + GPT chat (sales agent)
-# anthropic / google-genai: retired providers, not installed. See config.py.
+# ── AI (both agents run on Gemini) ────────────────────────
+google-genai==2.14.0             # Gemini vision (product drafts) + Gemini chat (sales agent)
+openai==2.48.0                   # retired provider, kept as a one-line swap-back. See config.py.
+# anthropic: retired, not installed.
 
 # ── Auth ──────────────────────────────────────────────────
 argon2-cffi==25.1.0              # Argon2id password hashing (OWASP-recommended)

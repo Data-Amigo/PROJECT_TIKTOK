@@ -64,16 +64,16 @@ class Settings(BaseSettings):
     # and fails with a human message, same pattern as the spike.
     apify_api_token: str = ""
 
-    # OpenAI powers BOTH agents (2026-07-26): the vision DRAFT agent (reads
-    # product/price off covers) AND the customer SALES chat. We have OpenAI
-    # billing, and GPT proved the more natural at the mixed English/Swahili/Sheng
-    # real customers type. Checked at call time, not boot, so a fresh clone starts.
-    openai_api_key: str = ""
-
-    # Legacy / optional, both unused now. Gemini was the earlier vision provider;
-    # Anthropic was briefly the chat provider (retired — weaker on Swahili/Sheng
-    # for our buyers). Kept as one-line swap-back points, not read anywhere.
+    # Gemini powers BOTH agents (2026-07-26): the vision DRAFT agent (reads
+    # product/price off covers) AND the customer SALES chat. On paid billing now,
+    # and it's the strongest of our options at Kenyan Swahili/Sheng. Checked at
+    # call time, not boot, so a fresh clone still starts.
     gemini_api_key: str = ""
+
+    # Legacy / optional, both unused now — retired providers kept as one-line
+    # swap-back points (we've swung Gemini↔OpenAI through the agent seam before).
+    # Not read anywhere while Gemini is active.
+    openai_api_key: str = ""
     anthropic_api_key: str = ""
 
     # REQUIRED (no default): the app refuses to boot without a database.

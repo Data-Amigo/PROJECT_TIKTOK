@@ -346,7 +346,7 @@ def test_resolve_video_unmatched_link_returns_null_product(client, db_session):
 def test_system_prompt_grounds_and_guards():
     """The prompt (where the conversational intelligence lives) must: inject the
     live catalogue as the source of truth, decode Sheng, forbid inventing
-    colours/sizes, and forbid formal textbook Swahili. No OpenAI call — this
+    colours/sizes, and forbid formal textbook Swahili. No model call — this
     asserts the guardrail text itself, deterministically."""
     from app.agent import sales
 
