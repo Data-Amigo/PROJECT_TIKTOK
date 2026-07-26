@@ -42,13 +42,13 @@ class Settings(BaseSettings):
     )
 
     # ── App identity ──
-    app_name: str = "BOB for Commerce"
+    app_name: str = "SokoLink"
     app_env: str = "dev"             # dev | staging | prod — gates docs page etc.
 
     # ── CORS ──
     # Which BROWSER origins may call this API (server-to-server calls ignore
     # CORS entirely — it's a browser rule). Comma-separated so prod can add
-    # the real domain via env: "https://bob.link,https://www.bob.link".
+    # the real domain via env: "https://sokolink,https://www.sokolink".
     # NEVER "*": a wildcard would let any website on the internet script
     # requests against our API from its visitors' browsers.
     cors_origins: str = "http://localhost:3000"
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
 
     # REQUIRED (no default): the app refuses to boot without a database.
-    # Points at BOB's OWN Railway Postgres — never a shared one. We learned
+    # Points at SokoLink's OWN Railway Postgres — never a shared one. We learned
     # this the concrete way: the first URL we tried held 28 tables from two
     # other projects, including a `products` table our migrations could have
     # mangled. One database per application, always.
@@ -84,6 +84,20 @@ class Settings(BaseSettings):
         other module ever thinks about URL schemes. .env stays exactly as
         Railway gave it (easy to re-paste on rotation)."""
         return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    # ── Auth (JWT) ──
+    # REQUIRED (no default): signs every login token. A hard-coded fallback
+    # here would mean anyone reading the repo can forge a valid login — so we
+    # refuse to boot without a real secret from .env. Generate one with:
+    #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+    secret_key: str
+
+    jwt_algorithm: str = "HS256"  # symmetric HMAC — one secret signs and verifies
+
+    # 7 days. Long enough that pilot sellers aren't re-logging-in constantly;
+    # short enough that a leaked token isn't valid forever. (Refresh tokens are
+    # a later hardening step; noted in the workplan.)
+    access_token_expire_minutes: int = 60 * 24 * 7
 
 
 # The one instance the whole app shares. Import THIS, never instantiate again —

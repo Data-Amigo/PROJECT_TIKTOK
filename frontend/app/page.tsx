@@ -1,5 +1,5 @@
 /**
- * Home — BOB system status page (M0's "everything is wired" proof).
+ * Home — SokoLink system status page (M0's "everything is wired" proof).
  *
  * SERVER COMPONENT (no "use client"): this function runs on the Next.js
  * server; the browser receives finished HTML. The fetch below is therefore
@@ -39,11 +39,9 @@ export default async function Home() {
   return (
     <div className="flex flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="w-full max-w-md px-6">
-        <h1 className="text-2xl font-bold tracking-tight">
-          BOB <span className="text-zinc-400">for Commerce</span>
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">Soko<span className="text-zinc-400">Link</span></h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Post once. Sell everywhere.
+          Where your audience becomes your customers.
         </p>
 
         <div className="mt-8">

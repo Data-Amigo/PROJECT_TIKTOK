@@ -1,4 +1,4 @@
-# WORKPLAN — Project TIKTOK (BOB for Commerce)
+# WORKPLAN — Project TIKTOK (SokoLink)
 
 > **How to read this file:** this is the living build plan. Each milestone (M0–M6)
 > is broken into small **sessions** — one sitting each. A session ends with something
@@ -41,19 +41,19 @@ TikTok/IG post                     seller pastes link
       │                                   │
       ▼                                   ▼
 ┌─────────────┐   scrape    ┌──────────────────────────┐
-│  BOB Page   │ ◄────────── │  FastAPI backend          │
+│  SokoLink Page   │ ◄────────── │  FastAPI backend          │
 │ (Next.js)   │             │  api/ agent/ services/    │
-│ bob.link/x  │             │  models/ ── Postgres      │
+│ sokolink/x  │             │  models/ ── Postgres      │
 └─────┬───────┘             └────┬─────────────┬───────┘
       │ buyer fills order form   │             │
       ▼                          ▼             ▼
 ┌─────────────┐   STK push   ┌───────┐   ┌────────────┐
-│ BOB Checkout│ ───────────► │Daraja │   │ Africa's   │
+│ SokoLink Checkout│ ───────────► │Daraja │   │ Africa's   │
 │ name·phone· │ ◄─────────── │M-Pesa │   │ Talking SMS│
 │ consent     │   callback   └───────┘   └─────┬──────┘
 └─────────────┘  = payment truth               │
                                                ▼
-                                    BOB Reach: restock SMS
+                                    SokoLink Reach: restock SMS
                                     (opt-in only, STOP honoured)
 ```
 
@@ -109,7 +109,7 @@ logs that can reconstruct any incident.
       machine). Design: /health = liveness only; readiness `checks` grow in 0.2.
       *You learned:* FastAPI anatomy, typed config via pydantic-settings,
       liveness vs readiness, in-process TestClient.
-- [x] **0.2 Database layer** — Railway Postgres (BOB's OWN database — first
+- [x] **0.2 Database layer** — Railway Postgres (SokoLink's OWN database — first
       URL was shared with 2 other projects incl. a `products` table collision;
       rule learned: one database per application). `db.py` with pool_pre_ping
       + pool_recycle (cloud DBs drop idle connections), Alembic wired to
@@ -138,7 +138,7 @@ is healthy. ✅ MET 2026-07-23 — page renders api: ok · db: ok end to end.
 
 ---
 
-## M1 — BOB Page  `branch: m1-bob-page`
+## M1 — SokoLink Page  `branch: m1-bob-page`
 
 *Goal: seller creates a page; public link shows item, price, Available/SOLD.*
 
@@ -189,7 +189,7 @@ is healthy. ✅ MET 2026-07-23 — page renders api: ok · db: ok end to end.
       social sharing, notFound() vs error boundaries, no-store for live data,
       why the public page reads stock from the DB not the scrape.
 
-**Done when:** a seller pastes a real TikTok link and a public `bob.link/handle`
+**Done when:** a seller pastes a real TikTok link and a public `sokolink/handle`
 page shows the item with live availability. ✅ MET 2026-07-25 — proven live end
 to end (kinjobales ingest → autofill → publish → public page renders the item,
 price, Available badge).
@@ -200,7 +200,7 @@ price, Available badge).
 > "paste a handle each time" to an **account-first shop** ending in an
 > **on-page agentic checkout**. Why: pasting a handle every time is too much
 > seller work, and WhatsApp's agentic close is blocked by Meta — so we build
-> the close *natively on the BOB page* (the original deck's "BOB Agent",
+> the close *natively on the SokoLink page* (the original deck's "SokoLink Agent",
 > relocated to the web where nobody can block it). The M-Pesa thesis is
 > preserved: the agent collects the phone to send the STK, and that phone *is*
 > the contact. Everything M1 built is reused — it just moves behind a login and
@@ -226,19 +226,31 @@ price, Available badge).
 
 *Goal: a seller signs up, connects TikTok once, and owns a storefront.*
 
-- [ ] **2.1 Auth** — `Account` model + sign up (name/phone/email/password) + login
-      (hashed passwords, session/JWT). Dashboard sits behind login.
-      *You learn:* password hashing, auth as a boundary, sessions vs tokens.
-- [ ] **2.2 Connect TikTok** — store the seller's TikTok username on the account;
-      on connect, auto-fill their storefront profile (display name, avatar, bio,
-      followers) from the scraped `authorMeta`. (Username now; true OAuth later.)
-      *You learn:* reusing the scraper behind an account; profile hydration.
-- [ ] **2.3 Storefront ownership** — the public `/[handle]` page belongs to the
-      account; the seller's phone (for M-Pesa) lives on the account.
-      *You learn:* tying public identity (handle) to a private account.
+- [x] **2.1 Auth** — `Account` model (email/phone unique) + Argon2id hashing +
+      signed JWT (SECRET_KEY required). Routes: signup/login/me (anti-enumeration,
+      hash never leaked, 422 border validation). Frontend: /signup + /login,
+      token in lib/auth.ts, dashboard gated. 34 tests; 66 green. Live-verified. (#14)
+      *You learned:* Argon2id, JWT auth, DB uniqueness, anti-enumeration,
+      border validation, gating a Next.js page.
+- [x] **2.2 Connect TikTok** — Seller now belongs to an Account (1-1) +
+      follower_count. `services/storefront.py`: connect scrapes ONCE → auto-fills
+      profile (name/avatar/bio/followers, phone from signup) AND pulls videos
+      into drafts; unique-handle slug; conflict if a username is owned elsewhere.
+      New endpoints: connect-tiktok / storefront / products/mine / products/refresh.
+      Live-verified (connect kinjobales → 1.4M followers, 8 drafts).
+      *You learned:* reusing the scraper behind an account; profile hydration.
+- [x] **2.3 Storefront ownership** — every product endpoint now requires login
+      and is scoped to the caller's storefront (ownership check → others'
+      products read as not-found). Public `/[handle]` belongs to the account;
+      phone (for M-Pesa) carried from signup. Redesigned dashboard: connect
+      screen ↔ storefront profile header + product grid (screenshotted). 20
+      tests; 72 green.
+      *You learned:* authorization (ownership) vs authentication, account-scoping
+      every query, tying public identity (handle) to a private account.
 
 **Done when:** a seller creates an account, connects their TikTok, and their
-`/[handle]` storefront shows their auto-filled profile.
+`/[handle]` storefront shows their auto-filled profile. ✅ MET 2026-07-26 —
+proven live end to end + dashboard screenshotted.
 
 ---
 
@@ -281,7 +293,7 @@ completes and flips an order to paid + stock to SOLD, hands-off.
 
 ## M5 — 🤖 Agentic checkout chat  `branch: m5-agent-checkout`  *(the crown jewel)*
 
-*Goal: a buyer chats on the BOB page; the agent answers, collects the phone,
+*Goal: a buyer chats on the SokoLink page; the agent answers, collects the phone,
 fires the STK, they pay — all on-page (the WhatsApp close, minus Meta).*
 
 - [ ] **5.1 Chat agent (Claude) + tools** — on-page chat; the agent answers
@@ -306,7 +318,7 @@ chat, and the order is real.
       reply. Async first (notification + reply), live (websockets) later.
       *You learn:* real-time transport, human-in-the-loop handoff.
 
-**Done when:** a seller answers a buyer's question inside the BOB chat.
+**Done when:** a seller answers a buyer's question inside the SokoLink chat.
 
 ---
 
@@ -352,6 +364,10 @@ first on purpose.
 | 2026-07-24 | M1.2 scraper (Apify adapter, validation border) + 🤖 draft agent. Model decision: **Gemini (gemini-3.6-flash) for vision** — reads Sheng/Swahili better than Anthropic (tested); Anthropic reserved for conversation. Live proof: hashtag-only cover → clean product draft, Sheng text translated, no price/stock (guardrail held) |
 | 2026-07-25 | M1.3 Products API — ingest/autofill/patch/public-page across schemas/service/routes; drafting split to on-demand (cost rail); 9 tests, 32 green (#11). CONCEPTS.md added (why-not-RAG etc.); Phase 2 generative try-on recorded |
 | 2026-07-25 | M1.4 Dashboard UI — Next.js seller screen (paste→ingest→autofill→price→publish), /media static mount. Live proof: real kinjobales ingest → Gemini named "Sundabests Insulated Beverage Dispenser" off the cover → published → public page (#12) |
-| 2026-07-25 | M1.5 Public BOB Page — server-rendered bob.link/<handle>, OG previews, 404+error boundaries, mobile-first, honest checkout-coming CTA. Screenshotted live. **M1 done-when met** → merge to main (#13) |
+| 2026-07-25 | M1.5 Public SokoLink Page — server-rendered sokolink/<handle>, OG previews, 404+error boundaries, mobile-first, honest checkout-coming CTA. Screenshotted live. **M1 done-when met** → merge to main (#13) |
 | 2026-07-25 | **Roadmap pivot** (seller feedback): account-first shop ending in an on-page **agentic checkout** (WhatsApp close relocated to web; M-Pesa thesis kept). Milestones re-sequenced M2 accounts → M3 inbox → M4 M-Pesa rails → M5 agent checkout → M6 seller chat → M7 reach+pilot |
 | 2026-07-25 | M1.6 Smart drafting — agent reads printed price (suggested_price_kes, pre-fills box, seller confirms) + product/non-product flag. Fixes real complaint. Live: clog covers → KES 600/650/900 read correctly. Guardrail refined in CONCEPTS §4. 35 tests green |
+| 2026-07-25 | Hotfix: friendly 429 when Gemini free-tier daily cap (20/day) hits — seller-safe message, not raw JSON. Guidance: enable Gemini billing for customer testing |
+| 2026-07-25 | M2.1 Seller accounts — Argon2id + JWT auth (signup/login/me), Kenyan phone normalization, browser sign-in (signup/login pages, gated dashboard). 34 tests, 66 green, live-verified (#14). SECRET_KEY added to .env |
+| 2026-07-25 | Rebrand: BOB → **SokoLink**, slogan "Where your audience becomes your customers." (23 files, verified live) |
+| 2026-07-26 | M2.2/2.3 Connect TikTok + account-scoped storefront — Seller↔Account 1-1, connect auto-fills profile + pulls videos, product endpoints login-gated + ownership-checked, redesigned dashboard (connect ↔ storefront). 72 green, live end to end. **M2 done-when met** → merge to main |

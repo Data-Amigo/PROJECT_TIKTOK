@@ -42,7 +42,7 @@ RAG — **R**etrieve, **A**ugment, **G**enerate — solves a specific problem:
 The load-bearing word is **similar**. You use RAG when you must find relevant
 information by *meaning*, because you don't have a key to look it up directly.
 
-**BOB never has that problem.** Trace every place BOB needs information:
+**SokoLink never has that problem.** Trace every place SokoLink needs information:
 
 - *"What product is in this video?"* → the answer is **in the cover image** we're
   already holding. Nothing to search. → **extraction** (§3)
@@ -57,7 +57,7 @@ In each case we know *exactly* which fact we need. Retrieval-by-known-key is a
 
 > **The contrast worth remembering.** The sibling project *Bonga na Mali*
 > (insurance) **does** use RAG — "what does my policy cover?" means searching
-> policy documents where you can't predict the relevant clause. Same brand (BOB),
+> policy documents where you can't predict the relevant clause. Same brand (SokoLink),
 > opposite information problem. Feeling *when* RAG fits is the lesson; the answer
 > here is "it doesn't."
 

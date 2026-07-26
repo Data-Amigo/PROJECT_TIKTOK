@@ -1,62 +1,79 @@
 """
 Products + Pages HTTP routes.
 
-    /api/products/ingest        POST   scrape a handle → DRAFT products
-    /api/products/{id}/autofill POST   run the 🤖 vision agent on one product
-    /api/products/{id}          PATCH  seller sets words/price/stock, publishes
-    /api/pages/{handle}         GET    public bob.link/<handle> data (buyers)
+    GET   /api/products/mine        the logged-in seller's products (dashboard)
+    POST  /api/products/refresh     re-pull the connected TikTok's latest videos
+    POST  /api/products/{id}/autofill  run the 🤖 vision agent on one product
+    PATCH /api/products/{id}        seller sets words/price/stock, publishes
+    GET   /api/pages/{handle}       public sokolink/<handle> data (buyers — no auth)
 
-Routes are thin: call a service, map its exceptions to HTTP. All the meaning
-lives in services/products.py.
+Every /api/products/* route requires login and is scoped to the caller's own
+storefront (ownership enforced in the service). Only /api/pages/* is public.
 """
 
-# Lazy annotations: lets us name ORM types (Product) in return hints without
-# importing them just for the annotation — they're strings until something asks.
+# Lazy annotations: name ORM types (Product) in hints without importing for it.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.agent.draft import DraftError, DraftQuotaError
+from app.api.deps import get_current_account
 from app.db import get_db
+from app.models.account import Account
 from app.models.product import Product
 from app.schemas.product import (
     AutofillOut,
-    IngestIn,
     ProductOut,
     ProductPublicOut,
     ProductUpdateIn,
     PublicPageOut,
 )
 from app.services import products as svc
+from app.services import storefront as store_svc
 from app.services.scraper import ScraperError
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 pages_router = APIRouter(prefix="/api/pages", tags=["pages"])
 
 
-# ── Seller-facing ─────────────────────────────────────────────────────────────
-@router.post("/ingest", response_model=list[ProductOut], status_code=status.HTTP_201_CREATED)
-def ingest(body: IngestIn, db: Session = Depends(get_db)) -> list[Product]:
-    """Paste a handle → we scrape recent videos into DRAFT products."""
+# ── Seller-facing (all require login, all scoped to the caller) ───────────────
+@router.get("/mine", response_model=list[ProductOut])
+def my_products(
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+) -> list[Product]:
+    """The seller's own products — what the dashboard shows on open."""
+    return svc.list_account_products(db, account)
+
+
+@router.post("/refresh", response_model=list[ProductOut])
+def refresh(
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+) -> list[Product]:
+    """Re-pull the connected TikTok's latest videos into draft products."""
     try:
-        return svc.ingest_seller_videos(db, body.handle, limit=body.limit)
+        store_svc.refresh(db, account)
+    except store_svc.StorefrontError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     except ScraperError as e:
-        # Upstream (Apify/TikTok) couldn't give us usable data → 502, not 500:
-        # our service is fine, the dependency failed. Message is human-safe.
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    return svc.list_account_products(db, account)
 
 
 @router.post("/{product_id}/autofill", response_model=AutofillOut)
-def autofill(product_id: int, db: Session = Depends(get_db)) -> AutofillOut:
-    """Run the vision draft agent on one product (fills name + description;
-    returns a price suggestion + product/non-product flag for the UI)."""
+def autofill(
+    product_id: int,
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+) -> AutofillOut:
+    """Run the vision draft agent on one of the seller's products."""
     try:
-        product, draft = svc.autofill_product(db, product_id)
+        product, draft = svc.autofill_product(db, account, product_id)
     except svc.ProductError as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
     except DraftQuotaError as e:
-        # AI usage cap — 429 so clients can distinguish "busy, retry" from a real fault.
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(e)) from e
     except DraftError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
@@ -71,21 +88,23 @@ def autofill(product_id: int, db: Session = Depends(get_db)) -> AutofillOut:
 
 
 @router.patch("/{product_id}", response_model=ProductOut)
-def update(product_id: int, body: ProductUpdateIn, db: Session = Depends(get_db)) -> Product:
-    """Seller confirms a draft: edit words, set price + stock, optionally publish."""
+def update(
+    product_id: int,
+    body: ProductUpdateIn,
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+) -> Product:
+    """Seller confirms one of THEIR drafts: words, price, stock, publish."""
     try:
-        return svc.update_product(db, product_id, body)
+        return svc.update_product(db, account, product_id, body)
     except svc.ProductError as e:
-        # "not found" and "can't publish without price" both land here; 400 is
-        # the honest catch-all for a rejected business request (the client sent
-        # something we won't do). 404-vs-400 nuance isn't worth leaking detail.
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
 
 
-# ── Buyer-facing ──────────────────────────────────────────────────────────────
+# ── Buyer-facing (public, no auth) ────────────────────────────────────────────
 @pages_router.get("/{handle}", response_model=PublicPageOut)
 def public_page(handle: str, db: Session = Depends(get_db)) -> PublicPageOut:
-    """The whole public shop page for bob.link/<handle>."""
+    """The whole public shop page for sokolink/<handle>."""
     try:
         seller = svc.get_public_page(db, handle)
     except svc.ProductError as e:

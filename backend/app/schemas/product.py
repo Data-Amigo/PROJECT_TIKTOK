@@ -91,7 +91,7 @@ class ProductPublicOut(BaseModel):
 
 
 class PublicPageOut(BaseModel):
-    """The whole bob.link/<handle> page in one response."""
+    """The whole sokolink/<handle> page in one response."""
 
     model_config = ConfigDict(from_attributes=True)
 

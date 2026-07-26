@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BOB for Commerce",
-  description: "Post once, sell everywhere — TikTok shop for Kenya.",
+  title: "SokoLink",
+  description: "Where your audience becomes your customers — TikTok shop for Kenya.",
 };
 
 export default function RootLayout({

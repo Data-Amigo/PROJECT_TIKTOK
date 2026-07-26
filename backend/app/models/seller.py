@@ -1,5 +1,7 @@
 """
-Seller — the shop owner. One row per pilot seller.
+Seller — the STOREFRONT. One per Account (1-to-1), created when the seller
+connects their TikTok. Profile fields (display_name, bio, avatar, followers)
+are auto-filled from the scraped TikTok author metadata.
 
 Field choices trace to spike 00 (real kinjobales_wholesale data):
 the TikTok bio carried shop addresses + phone numbers, so we keep the raw
@@ -8,7 +10,7 @@ bio as onboarding source material and auto-fill from it later.
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -21,7 +23,15 @@ class Seller(Base):
     # is `handle` below. Never leak DB ids into URLs.
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    # The bob.link/<handle> slug. Unique + indexed because the public page
+    # The OWNER. UNIQUE → one account owns exactly one storefront (1-to-1).
+    # CASCADE: deleting an account removes its storefront (and its products).
+    # Nullable only so the migration can add the column to any legacy rows;
+    # every storefront created from here on has an owner.
+    account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), unique=True, nullable=True, index=True
+    )
+
+    # The sokolink/<handle> slug. Unique + indexed because the public page
     # looks sellers up by it on every single view.
     handle: Mapped[str] = mapped_column(String(50), unique=True, index=True)
 
@@ -29,7 +39,7 @@ class Seller(Base):
     display_name: Mapped[str] = mapped_column(String(100))
 
     # Their TikTok username (authorMeta.name in the Apify payload). Unique:
-    # one BOB seller per TikTok account — a second registration is a mistake
+    # one SokoLink seller per TikTok account — a second registration is a mistake
     # or an impersonation, and the DB should refuse both. Nullable because a
     # seller can be created before their TikTok is connected.
     tiktok_username: Mapped[str | None] = mapped_column(
@@ -49,11 +59,17 @@ class Seller(Base):
     # OUR stored copy of their avatar (TikTok CDN URLs expire — spike 00).
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Follower count from authorMeta.fans — a trust signal on the storefront.
+    follower_count: Mapped[int] = mapped_column(Integer, default=0)
+
     # DB-clock timestamp (timezone=True → stored as timestamptz). App-server
     # clocks drift and lie; the database's clock is the one shared truth.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+    # 1-to-1 back to the owning account.
+    account = relationship("Account", back_populates="seller")
 
     # ORM convenience: seller.products / product.seller. delete-orphan means
     # deleting a seller through the ORM removes their products too — matches

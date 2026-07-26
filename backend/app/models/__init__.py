@@ -1,5 +1,5 @@
 """
-Models package — every table BOB owns, one file per aggregate.
+Models package — every table SokoLink owns, one file per aggregate.
 
     Base (app/db.py)
       ├── Seller   (seller.py)   who sells: handle, bio, contacts
@@ -11,9 +11,10 @@ that reason — a model missing from the imports below is INVISIBLE to
 migrations (autogenerate would try to drop its table).
 """
 
+from app.models.account import Account
 from app.models.product import Product, ProductStatus
 from app.models.seller import Seller
 
 # What `from app.models import *` exposes; also doubles as the checklist of
 # every model that exists — keep it exhaustive.
-__all__ = ["Seller", "Product", "ProductStatus"]
+__all__ = ["Account", "Seller", "Product", "ProductStatus"]

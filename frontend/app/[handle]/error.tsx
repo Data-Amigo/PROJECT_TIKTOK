@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Error boundary for bob.link/<handle>. Catches the "backend is down / fetch
+ * Error boundary for sokolink/<handle>. Catches the "backend is down / fetch
  * failed" throw from fetchPublicPage (NOT a 404 — that goes to not-found.tsx).
  * A customer sees "try again", never a stack trace or a false "shop doesn't
  * exist". Must be a client component — Next requires error boundaries to be.
