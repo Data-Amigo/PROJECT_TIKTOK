@@ -232,16 +232,25 @@ price, Available badge).
       token in lib/auth.ts, dashboard gated. 34 tests; 66 green. Live-verified. (#14)
       *You learned:* Argon2id, JWT auth, DB uniqueness, anti-enumeration,
       border validation, gating a Next.js page.
-- [ ] **2.2 Connect TikTok** — store the seller's TikTok username on the account;
-      on connect, auto-fill their storefront profile (display name, avatar, bio,
-      followers) from the scraped `authorMeta`. (Username now; true OAuth later.)
-      *You learn:* reusing the scraper behind an account; profile hydration.
-- [ ] **2.3 Storefront ownership** — the public `/[handle]` page belongs to the
-      account; the seller's phone (for M-Pesa) lives on the account.
-      *You learn:* tying public identity (handle) to a private account.
+- [x] **2.2 Connect TikTok** — Seller now belongs to an Account (1-1) +
+      follower_count. `services/storefront.py`: connect scrapes ONCE → auto-fills
+      profile (name/avatar/bio/followers, phone from signup) AND pulls videos
+      into drafts; unique-handle slug; conflict if a username is owned elsewhere.
+      New endpoints: connect-tiktok / storefront / products/mine / products/refresh.
+      Live-verified (connect kinjobales → 1.4M followers, 8 drafts).
+      *You learned:* reusing the scraper behind an account; profile hydration.
+- [x] **2.3 Storefront ownership** — every product endpoint now requires login
+      and is scoped to the caller's storefront (ownership check → others'
+      products read as not-found). Public `/[handle]` belongs to the account;
+      phone (for M-Pesa) carried from signup. Redesigned dashboard: connect
+      screen ↔ storefront profile header + product grid (screenshotted). 20
+      tests; 72 green.
+      *You learned:* authorization (ownership) vs authentication, account-scoping
+      every query, tying public identity (handle) to a private account.
 
 **Done when:** a seller creates an account, connects their TikTok, and their
-`/[handle]` storefront shows their auto-filled profile.
+`/[handle]` storefront shows their auto-filled profile. ✅ MET 2026-07-26 —
+proven live end to end + dashboard screenshotted.
 
 ---
 
@@ -360,3 +369,5 @@ first on purpose.
 | 2026-07-25 | M1.6 Smart drafting — agent reads printed price (suggested_price_kes, pre-fills box, seller confirms) + product/non-product flag. Fixes real complaint. Live: clog covers → KES 600/650/900 read correctly. Guardrail refined in CONCEPTS §4. 35 tests green |
 | 2026-07-25 | Hotfix: friendly 429 when Gemini free-tier daily cap (20/day) hits — seller-safe message, not raw JSON. Guidance: enable Gemini billing for customer testing |
 | 2026-07-25 | M2.1 Seller accounts — Argon2id + JWT auth (signup/login/me), Kenyan phone normalization, browser sign-in (signup/login pages, gated dashboard). 34 tests, 66 green, live-verified (#14). SECRET_KEY added to .env |
+| 2026-07-25 | Rebrand: BOB → **SokoLink**, slogan "Where your audience becomes your customers." (23 files, verified live) |
+| 2026-07-26 | M2.2/2.3 Connect TikTok + account-scoped storefront — Seller↔Account 1-1, connect auto-fills profile + pulls videos, product endpoints login-gated + ownership-checked, redesigned dashboard (connect ↔ storefront). 72 green, live end to end. **M2 done-when met** → merge to main |

@@ -111,5 +111,6 @@ vs extraction; the model proposes a clip, code decides if it's allowed).
 - [x] Folder skeleton
 - [x] Plan set to web-first
 - [x] M0 — Foundation (all services boot, `/health` green)
-- [x] M1 — SokoLink Page (seller pastes handle → drafts → price/publish → public `sokolink/<handle>` with live availability)
-- [ ] M2 — Checkout + contact capture (next)
+- [x] M1 — SokoLink Page (drafts → price/publish → public `sokolink/<handle>` with live availability)
+- [x] M2 — Seller accounts + storefront (sign up → connect TikTok once → profile auto-filled → account-scoped shop)
+- [ ] M3 — Content Inbox + auto-drafting (next)
