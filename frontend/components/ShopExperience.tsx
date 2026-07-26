@@ -105,7 +105,7 @@ export function ShopExperience({
 
         <footer className="mt-10 border-t border-zinc-200 pt-6 text-center dark:border-zinc-800">
           <p className="text-xs text-zinc-400">
-            Powered by <span className="font-semibold text-zinc-600 dark:text-zinc-300">Bonga na Bob</span>{" "}
+            Powered by <span className="font-semibold text-zinc-600 dark:text-zinc-300">SokoLink</span>{" "}
             · Where your audience becomes your customers
           </p>
         </footer>
