@@ -241,6 +241,21 @@ export async function fetchPublicPage(handle: string): Promise<PublicPage | type
   return res.json();
 }
 
+/** What a pasted TikTok link resolved to. `product` is null when the link
+ *  didn't match one of this shop's products (see ResolveVideoOut). */
+export type ResolvedVideo = { video_id: string | null; product: PublicProduct | null };
+
+/** Resolve a TikTok video link a customer pasted → the product it features.
+ *  Accepts full OR short links (the backend follows short-link redirects). */
+export async function resolveVideo(handle: string, url: string): Promise<ResolvedVideo> {
+  const res = await fetch(`${API_URL}/api/pages/${encodeURIComponent(handle)}/resolve-video`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  return (await throwOnError(res)).json();
+}
+
 /** Ask the shop's 🤖 sales agent. `messages` is the conversation (starts with a
  *  user turn); `videoId` is the video the buyer arrived from (?v=), if any. */
 export async function chatWithShop(

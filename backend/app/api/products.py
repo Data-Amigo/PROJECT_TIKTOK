@@ -31,9 +31,12 @@ from app.schemas.product import (
     ProductPublicOut,
     ProductUpdateIn,
     PublicPageOut,
+    ResolveVideoIn,
+    ResolveVideoOut,
 )
 from app.services import products as svc
 from app.services import storefront as store_svc
+from app.services import tiktok_links
 from app.services.scraper import ScraperError
 
 router = APIRouter(prefix="/api/products", tags=["products"])
@@ -175,3 +178,22 @@ def shop_chat(handle: str, body: ChatIn, db: Session = Depends(get_db)) -> ChatO
     except sales.SalesError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
     return ChatOut(reply=reply)
+
+
+@pages_router.post("/{handle}/resolve-video", response_model=ResolveVideoOut)
+def resolve_video(handle: str, body: ResolveVideoIn, db: Session = Depends(get_db)) -> ResolveVideoOut:
+    """A customer pasted a TikTok video link — tell them which product it is.
+    Public. Never errors on a bad link: an unmatched paste returns product=null
+    so the UI shows a friendly 'not found', not a red error."""
+    try:
+        seller = svc.get_public_page(db, handle)
+    except svc.ProductError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from e
+
+    video_id = tiktok_links.resolve_video_id(body.url)
+    product = None
+    if video_id:
+        match = next((p for p in svc.public_products(seller) if p.tiktok_video_id == video_id), None)
+        if match is not None:
+            product = ProductPublicOut.model_validate(match)
+    return ResolveVideoOut(video_id=video_id, product=product)
