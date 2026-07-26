@@ -276,7 +276,15 @@ function ShopView({
       {products.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((p) => (
-            <ProductCard key={p.id} product={p} onChange={onReplaceProduct} />
+            // Key includes drafted-ness: when a product goes un-drafted → drafted
+            // (auto-fill arrives), the key changes and the card remounts, so its
+            // editable fields pick up the drafted name/price instead of staying
+            // blank. Once drafted the key is stable, so edits don't remount it.
+            <ProductCard
+              key={`${p.id}-${p.name.trim() ? "d" : "u"}`}
+              product={p}
+              onChange={onReplaceProduct}
+            />
           ))}
         </div>
       ) : (
