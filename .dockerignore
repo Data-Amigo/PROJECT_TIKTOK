@@ -1,0 +1,22 @@
+# Keep the Docker build context small and correct. The backend image only needs
+# backend/ source + requirements.txt — everything below is excluded.
+
+# Python virtualenv (huge — must never enter the context) + caches
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+
+# Not part of the backend image
+frontend
+docs
+shared
+.git
+.github
+.claude
+
+# Runtime/generated + secrets (config comes from Railway variables, not .env)
+backend/media
+backend/spikes/out
+.env
+*.md

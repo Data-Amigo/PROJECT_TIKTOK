@@ -8,13 +8,16 @@ tell what to build.
 
 ## Backend service (deploy this first — M-Pesa needs it)
 
+The repo has a root **`Dockerfile`** that builds the backend. Railway uses it
+automatically, so **no Root Directory setting is needed** — the Dockerfile
+installs `backend/requirements.txt`, runs `alembic upgrade head` (idempotent),
+and starts `uvicorn app.main:app` on `$PORT`. (`.dockerignore` keeps `.venv`,
+`media/`, and the frontend out of the build.)
+
 1. **New service → Deploy from GitHub repo** → pick `PROJECT_TIKTOK`.
-2. **Settings → Source → Root Directory** = `backend`
-   *(this is the fix — now the builder sees `backend/requirements.txt` → Python.)*
-   Build/start come from `backend/railway.json`:
-   - install: `requirements.txt` (auto), Python pinned by `backend/.python-version` (3.11)
-   - migrate on each deploy: `alembic upgrade head` (idempotent — no-op if already at head)
-   - start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+2. If the build still shows *"Railpack analyzed …"* (auto-detect) instead of
+   using the Dockerfile: **Settings → Build → Builder = Dockerfile**. That's the
+   only setting that might need a nudge.
 3. **Variables** → add every key from your local `.env` (copy the values):
 
    | Variable | Notes |
