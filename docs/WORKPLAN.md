@@ -291,22 +291,46 @@ completes and flips an order to paid + stock to SOLD, hands-off.
 
 ---
 
-## M5 — 🤖 Agentic checkout chat  `branch: m5-agent-checkout`  *(the crown jewel)*
+## M5 — 🤖 Context-aware AI sales agent  `branch: m5-agent-checkout`  *(the crown jewel)*
 
-*Goal: a buyer chats on the SokoLink page; the agent answers, collects the phone,
-fires the STK, they pay — all on-page (the WhatsApp close, minus Meta).*
+*Goal (seller's vision, 2026-07-26): **Video → AI Sales Agent → Catalogue → Checkout.**
+A buyer taps the link FROM A SPECIFIC VIDEO and lands in a conversation that already
+knows which product they came from — the WhatsApp close, on-page, minus Meta.*
 
-- [ ] **5.1 Chat agent (Claude) + tools** — on-page chat; the agent answers
-      product questions from the DB (direct lookup, not RAG) and has TOOLS:
-      `get_product`, `check_stock`, `create_order`, `send_stk_push`.
-      *You learn:* tool use / function calling, the agent loop, tools as gates.
+The public page becomes a conversational storefront:
+
+```
+buyer taps  sokolink/<handle>?v=<video_id>
+      │
+      ▼
+┌───────────────────────────────┐
+│  👗 Product from the video     │  ← hero: the exact item, image, price, [Buy Now]
+│  Black Bodycon Dress · KES 1500│
+├───────────────────────────────┤
+│  🤖 "Hi! You're looking at the │  ← agent already knows the video → product,
+│      black dress from the video"│     price, sizes, colours, stock
+│  "Do you have this in red?"     │
+│  "Something similar under 1000?"│
+│  [ Browse all products 🛍️ ]     │  ← catalogue as a bottom-sheet / pop-up
+└───────────────────────────────┘
+```
+
+- [ ] **5.0 Per-video context links** — the seller's link carries `?v=<video_id>`;
+      the public page resolves it to the featured product and greets the buyer with
+      it. (No AI/payment yet — pure context + a product-from-video hero + a
+      bottom-sheet catalogue.) *You learn:* deep-linking context, bottom-sheet UX.
+- [ ] **5.1 Chat agent (Claude) + tools** — on-page chat; answers product questions
+      from the DB (direct lookup, not RAG): "in red?", "cheaper?", "under KES 1000?".
+      TOOLS: `get_product`, `search_catalogue`, `check_stock`, `create_order`,
+      `send_stk_push`. *You learn:* tool use / function calling, the agent loop.
 - [ ] **5.2 Close the sale** — agent confirms item + collects phone → calls
       `send_stk_push` (the M4 rail) → M4 callback = truth marks it paid. The agent
       never charges; it *requests* a charge the rails execute.
       *You learn:* agent-proposes/code-disposes across a real payment.
 
-**Done when:** a buyer completes a sandbox purchase entirely through the on-page
-chat, and the order is real.
+**Done when:** a buyer taps a video link, chats to find/confirm a product, and
+completes a sandbox purchase entirely on-page. **Needs M4 rails first** (rails
+before agent) and **Gemini/LLM billing** enabled.
 
 ---
 
@@ -371,3 +395,4 @@ first on purpose.
 | 2026-07-25 | M2.1 Seller accounts — Argon2id + JWT auth (signup/login/me), Kenyan phone normalization, browser sign-in (signup/login pages, gated dashboard). 34 tests, 66 green, live-verified (#14). SECRET_KEY added to .env |
 | 2026-07-25 | Rebrand: BOB → **SokoLink**, slogan "Where your audience becomes your customers." (23 files, verified live) |
 | 2026-07-26 | M2.2/2.3 Connect TikTok + account-scoped storefront — Seller↔Account 1-1, connect auto-fills profile + pulls videos, product endpoints login-gated + ownership-checked, redesigned dashboard (connect ↔ storefront). 72 green, live end to end. **M2 done-when met** → merge to main |
+| 2026-07-26 | **Auto-drafting** (seller feedback: "don't make me click auto-fill"). Products auto-draft on connect/refresh (name/desc + a readable price → DRAFT price; publish stays the human gate — guardrail v3, CONCEPTS §4). Graceful AI-cap pause + manual fallback. Auth tests randomized (collision-proof). 75 green. **Gemini billing is the gate for auto-draft + the M5 agent.** M5 reshaped into the context-aware AI sales agent (Video→Agent→Catalogue→Checkout, per-video `?v=` links, bottom-sheet catalogue) per seller's vision |

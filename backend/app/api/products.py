@@ -23,6 +23,7 @@ from app.db import get_db
 from app.models.account import Account
 from app.models.product import Product
 from app.schemas.product import (
+    AutodraftOut,
     AutofillOut,
     ProductOut,
     ProductPublicOut,
@@ -60,6 +61,21 @@ def refresh(
     except ScraperError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
     return svc.list_account_products(db, account)
+
+
+@router.post("/autodraft", response_model=AutodraftOut)
+def autodraft(
+    db: Session = Depends(get_db),
+    account: Account = Depends(get_current_account),
+) -> AutodraftOut:
+    """Auto-draft all of the seller's un-drafted products (name/description +
+    a price the AI can read). Best-effort; `ai_paused` if the daily cap stopped
+    it. The seller only reviews + publishes."""
+    products, ai_paused = svc.autodraft_account(db, account)
+    return AutodraftOut(
+        products=[ProductOut.model_validate(p) for p in products],
+        ai_paused=ai_paused,
+    )
 
 
 @router.post("/{product_id}/autofill", response_model=AutofillOut)

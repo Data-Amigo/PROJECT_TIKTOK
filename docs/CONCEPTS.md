@@ -104,16 +104,26 @@ Concretely, in `draft.py`:
   (schema) and `test_autofill_sets_name_and_description_only` (the service leaves
   the stored price untouched even when the agent suggested one).
 
-**A refinement we made after real sellers hit it (2026-07-25).** Sellers often print
-the price right on the cover — *"clogs 600 ksh"*. Making them retype that was silly,
-so the agent now READS it and returns `suggested_price_kes`. But notice the guardrail
-didn't weaken, it got *more precise*: the suggestion only **pre-fills the seller's
-price box** (highlighted "read from image — confirm it"); it is never written to the
-stored/published price. The seller, looking at the same photo, confirms it. So the
-human is still the one who sets money — we just stopped making them copy what's on the
-picture. The rule is now: **the agent may SUGGEST a price it can SEE; only the seller
-can SET one.** If the model misreads *800* as *400*, the seller catches it at the
-confirm step — the misread never reaches `Product.price_kes` on its own.
+**How the money guardrail evolved (and why it's still safe).** Three steps, each
+driven by real use:
+
+1. *v1* — the draft schema had **no price field** at all. Safe, but it made sellers
+   retype prices that were printed right on the cover (*"clogs 600 ksh"*).
+2. *v2* — the agent **suggested** a price (pre-filled the box) but never persisted it.
+   Better, but the suggestion vanished on reload, and the seller still did the work.
+3. *v3 (current, 2026-07-26)* — sellers told us plainly: *don't make me click and type;
+   just draft it.* So products are now **auto-drafted** and the AI-read price is
+   **written to `Product.price_kes` as a DRAFT price**. The safety didn't move — it
+   just moved to the right gate: **a product is never LIVE until the seller hits
+   Publish**, and Publish is a deliberate, per-product human action that still
+   *requires* a price. The AI removes typing; it can't sell anything.
+
+So the rule is now: **the AI drafts a price it can read; going live is always the
+seller's explicit act.** If the model misreads *800* as *400*, the wrong number sits
+in a DRAFT the seller reviews before publishing — it never reaches a buyer on its own.
+(And the AI only fills a price the seller hasn't already set — it never clobbers a
+human price.) The deterministic rails underneath — publish-requires-price, the DB
+CheckConstraint, ownership scoping — are unchanged.
 
 Generalize it: **the LLM talks; code transacts.** The agent drafts words, suggests a
 price it can read, flags non-products, later answers buyer questions and *proposes* an
