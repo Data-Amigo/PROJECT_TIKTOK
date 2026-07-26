@@ -9,11 +9,11 @@ For now it ANSWERS (product Q&A, find-me-something); the actual "Buy Now"
 (M-Pesa STK) is M4, wired in later. Per rails-before-agent, the agent can talk
 about money but cannot move it until the payment rails exist.
 
-WHY OpenAI here (BOTH chat and vision now): Fredrick tested the chat in Swahili
-and Sheng — the way real Kenyan customers actually type (mixed English +
-Swahili) — and found GPT the more natural. So this file uses OpenAI too; the
-Anthropic split is retired. THIS FILE is the only place that knows which chat
-provider we use — callers just see answer().
+WHY Gemini here (BOTH chat and vision now, 2026-07-26): Fredrick moved to paid
+Gemini — it's the strongest of the three at Kenyan Swahili/Sheng, the mixed way
+real customers type. THIS FILE is the only place that knows which chat provider
+we use — callers just see answer(). The prompt below is provider-agnostic text,
+so it survived the Anthropic→OpenAI→Gemini moves unchanged.
 
 HUMAN, not "assistant": the shopper should feel like they're chatting with the
 real shop, not a bot. The persona speaks in the first person AS the shop, never
@@ -26,22 +26,28 @@ products are relevant (there's no 10,000-doc search problem), so a plain lookup
 beats a vector database. See CONCEPTS §2.
 """
 
-from openai import OpenAI, RateLimitError
+from google import genai
+from google.genai import errors, types
 from pydantic import BaseModel
 
 from app.config import settings
 
-# gpt-4o (full, not -mini): this is the customer's first impression, and it must
-# handle mixed English + Swahili + Sheng naturally — the full model is markedly
-# better at that than -mini. Bump/swap here if cost or quality dictates — one
-# constant is the whole model choice.
-MODEL = "gpt-4o"
-# Short, DM-style replies — a hard cap also physically bounds rambling.
-MAX_TOKENS = 260
-# Low temperature: this is a grounded shop assistant, not a copywriter. gpt-4o's
-# salesy instinct will invent colours/sizes/stock at higher temps; 0.2 keeps it
-# warm but obedient to the source-of-truth rules below.
-TEMPERATURE = 0.2
+# gemini-3.6-flash: fast, cheap, and the best of our options at Kenyan Swahili/
+# Sheng — right for a high-volume customer chat. One constant is the whole model
+# choice; bump to a pro tier if quality ever needs it.
+MODEL = "gemini-3.6-flash"
+# A high CEILING, not a target: on 3.6-flash the "thinking" tokens count against
+# this budget, so a tight cap truncated real answers mid-word. Brevity comes from
+# the prompt (1-2 sentences), not this number — the model stops when it's done.
+MAX_TOKENS = 1024
+# Low temperature: a grounded shop assistant, not a copywriter. Higher temps let
+# the model invent colours/sizes/stock; low keeps it warm but obedient to the
+# source-of-truth rules below.
+TEMPERATURE = 0.3
+
+# Chat roles differ across providers: OpenAI/Anthropic use "assistant", Gemini
+# uses "model". Our stored history uses "assistant", so map it at the boundary.
+_ROLE = {"user": "user", "assistant": "model"}
 
 
 class SalesError(Exception):
@@ -154,22 +160,35 @@ def answer(
 ) -> str:
     """Produce the agent's next reply. `history` is the conversation so far as
     chat messages ([{role, content}], starting with the buyer's 'user')."""
-    if not settings.openai_api_key:
-        raise SalesError("OPENAI_API_KEY is not set — add it to .env.")
+    if not settings.gemini_api_key:
+        raise SalesError("GEMINI_API_KEY is not set — add it to .env.")
 
-    client = OpenAI(api_key=settings.openai_api_key)
-    messages = [{"role": "system", "content": _system_prompt(shop_name, catalogue, featured)}, *history]
+    client = genai.Client(api_key=settings.gemini_api_key)
+    # Map our history to Gemini turns (role "assistant" → "model").
+    contents = [
+        types.Content(role=_ROLE.get(m["role"], "user"), parts=[types.Part(text=m["content"])])
+        for m in history
+    ]
     try:
-        resp = client.chat.completions.create(
+        resp = client.models.generate_content(
             model=MODEL,
-            max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE,
-            messages=messages,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=_system_prompt(shop_name, catalogue, featured),
+                temperature=TEMPERATURE,
+                max_output_tokens=MAX_TOKENS,
+                # Minimal "thinking": 3.6-flash won't accept 0 (mandatory-thinking
+                # model); a small budget keeps replies fast/cheap. It IS counted
+                # against max_output_tokens above — hence the generous ceiling.
+                thinking_config=types.ThinkingConfig(thinking_budget=128),
+            ),
         )
-    except RateLimitError as e:
-        raise SalesError("The shop is busy right now — please try again in a moment.") from e
+    except errors.APIError as e:
+        if getattr(e, "code", None) == 429:
+            raise SalesError("The shop is busy right now — please try again in a moment.") from e
+        raise SalesError("Had a hiccup — please try again.") from e
     except Exception as e:
         raise SalesError("Had a hiccup — please try again.") from e
 
-    text = (resp.choices[0].message.content or "").strip()
+    text = (resp.text or "").strip()
     return text or "Pole, sijaelewa vizuri — unaweza rudia?"

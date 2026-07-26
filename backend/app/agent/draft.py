@@ -5,11 +5,12 @@ Draft agent 🤖 — a cover image becomes a product draft. (Session 1.2, part 2
                                           structured output   {name, description, price?…}
                                                               seller CONFIRMS; publish = human gate
 
-WHY OpenAI here: Fredrick has OpenAI billing, so we use GPT vision for extraction
-instead of Gemini's capped free tier. (OpenAI now runs the customer sales chat
-too — see agent/sales.py.) THIS FILE is the only place that knows which vision
-provider we use — callers just see draft_from_video(). Swapping the model or the
-whole provider is a change here and nowhere else (the adapter pattern).
+WHY Gemini here (2026-07-26): Fredrick moved to paid Gemini — it reads Sheng/
+Swahili in-video text noticeably better, and now runs the customer sales chat too
+(see agent/sales.py). THIS FILE is the only place that knows which vision provider
+we use — callers just see draft_from_video(). Swapping the model or the whole
+provider is a change here and nowhere else (the adapter pattern). We've swung
+Gemini→OpenAI→Gemini through this one seam without touching a single caller.
 
 TWO lessons this file teaches — the heart of safe LLM integration:
 
@@ -24,23 +25,22 @@ TWO lessons this file teaches — the heart of safe LLM integration:
      sell anything at an unconfirmed price. See CONCEPTS §4.
 """
 
-import base64
-
-from openai import OpenAI, RateLimitError
+from google import genai
+from google.genai import errors, types
 from pydantic import BaseModel, Field
 
 from app.config import settings
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-# gpt-4o-mini: cheap, fast, vision-capable, supports the structured-output
-# constraint below, and strong enough at OCR + multilingual (Sheng/Swahili) for
-# reading a product + a printed price. Bump to gpt-4o (or a gpt-5 mini) here if
-# quality needs it — this one constant is the whole model choice.
-MODEL = "gpt-4o-mini"
+# gemini-3.6-flash: current flash tier — cheap, fast, strong multilingual vision
+# (reads Sheng/Swahili + printed prices off covers), supports the structured-
+# output constraint below. Bump to a pro tier here if quality needs it — this
+# one constant is the whole model choice.
+MODEL = "gemini-3.6-flash"
 
 # Low temperature: this is extraction, not creative writing. Same image →
 # same draft; describe what's SEEN, don't invent flattering copy.
-TEMPERATURE = 0
+TEMPERATURE = 0.2
 
 
 class DraftError(Exception):
@@ -125,8 +125,8 @@ def draft_from_video(
     seller will confirm. Raises DraftError on any failure — the UI shows the
     seller a plain message, never a stack trace.
     """
-    if not settings.openai_api_key:
-        raise DraftError("OPENAI_API_KEY is not set — add it to .env (see .env.example).")
+    if not settings.gemini_api_key:
+        raise DraftError("GEMINI_API_KEY is not set — add it to .env (see .env.example).")
     if cover_bytes is None:
         raise DraftError("No cover image to draft from.")
 
@@ -136,57 +136,46 @@ def draft_from_video(
     user_text = (
         f"Caption (mostly hashtags, low value): {caption!r}\n"
         f"Hashtags (weak category hints): {', '.join(hashtags) or 'none'}\n"
-        "Draft the product from the cover image."
+        "Draft the product from the cover image above."
     )
-    b64 = base64.b64encode(cover_bytes).decode("ascii")
 
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = genai.Client(api_key=settings.gemini_api_key)
     try:
-        completion = _parse(
-            client,
+        resp = client.models.generate_content(
             model=MODEL,
-            temperature=TEMPERATURE,
-            messages=[
-                {"role": "system", "content": SYSTEM_INSTRUCTION},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": user_text},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
-                    ],
-                },
+            contents=[
+                types.Part.from_bytes(data=cover_bytes, mime_type="image/jpeg"),
+                user_text,
             ],
-            # Structured output: the response is CONSTRAINED to ProductDraft's
-            # schema; `.parsed` hands back a validated ProductDraft.
-            response_format=ProductDraft,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+                temperature=TEMPERATURE,
+                # THIS pair is the structured-output guarantee: the response is
+                # constrained to valid JSON matching ProductDraft; resp.parsed
+                # then hands us a validated ProductDraft, no parsing-by-hope.
+                response_mime_type="application/json",
+                response_schema=ProductDraft,
+            ),
         )
-    except RateLimitError as e:
-        # 429 — rate limit or exhausted billing. One friendly message for both.
-        raise DraftQuotaError(
-            "The image reader has reached its usage limit. Try again shortly, or "
-            "check the OpenAI billing. You can still fill in the details by hand."
+    except errors.APIError as e:
+        # 429 = rate limit / quota. Distinct so autodraft can pause gracefully.
+        if getattr(e, "code", None) == 429:
+            raise DraftQuotaError(
+                "The image reader has reached its usage limit. Try again shortly, or "
+                "check the Gemini billing. You can still fill in the details by hand."
+            ) from e
+        raise DraftError(
+            "Couldn't read this image automatically — please fill in the details manually."
         ) from e
     except Exception as e:
         raise DraftError(
             "Couldn't read this image automatically — please fill in the details manually."
         ) from e
 
-    message = completion.choices[0].message
-    if getattr(message, "refusal", None):
-        raise DraftError("The image reader declined to read this image.")
-    draft = message.parsed
+    draft = resp.parsed
     if not isinstance(draft, ProductDraft):
         raise DraftError("The image reader returned an unparseable draft.")
     return draft
-
-
-def _parse(client: OpenAI, **kwargs):
-    """Call the structured-output parse helper, whichever path this SDK exposes
-    (it moved out of the `beta` namespace across versions — support both)."""
-    parse = getattr(client.chat.completions, "parse", None)
-    if parse is not None:
-        return parse(**kwargs)
-    return client.beta.chat.completions.parse(**kwargs)
 
 
 # ── SMOKE TEST ────────────────────────────────────────────────────────────────
