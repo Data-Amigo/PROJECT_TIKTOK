@@ -3,7 +3,8 @@ Models package — every table SokoLink owns, one file per aggregate.
 
     Base (app/db.py)
       ├── Seller   (seller.py)   who sells: handle, bio, contacts
-      └── Product  (product.py)  what's for sale: scrape + price + stock
+      ├── Product  (product.py)  what's for sale: scrape + price + stock
+      └── Order    (order.py)    a buy attempt: pending → paid/failed (M-Pesa)
 
 IMPORTANT: importing this package is what REGISTERS the tables on
 Base.metadata. Alembic's env.py does `from app import models` for exactly
@@ -12,9 +13,10 @@ migrations (autogenerate would try to drop its table).
 """
 
 from app.models.account import Account
+from app.models.order import Order, OrderStatus
 from app.models.product import Product, ProductStatus
 from app.models.seller import Seller
 
 # What `from app.models import *` exposes; also doubles as the checklist of
 # every model that exists — keep it exhaustive.
-__all__ = ["Account", "Seller", "Product", "ProductStatus"]
+__all__ = ["Account", "Seller", "Product", "ProductStatus", "Order", "OrderStatus"]

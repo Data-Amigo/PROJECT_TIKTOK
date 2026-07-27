@@ -19,6 +19,8 @@ from sqlalchemy import text
 
 from app.api import account as account_api
 from app.api import auth as auth_api
+from app.api import daraja as daraja_api
+from app.api import orders as orders_api
 from app.api import products as products_api
 from app.config import settings
 from app.db import engine
@@ -63,7 +65,9 @@ app.mount("/media", StaticFiles(directory=MEDIA_ROOT), name="media")
 app.include_router(auth_api.router)            # /api/auth/*      (accounts)
 app.include_router(account_api.router)         # /api/account/*   (storefront)
 app.include_router(products_api.router)        # /api/products/*  (seller)
-app.include_router(products_api.pages_router)  # /api/pages/*     (buyer)
+app.include_router(products_api.pages_router)  # /api/pages/*     (buyer: page, chat, checkout)
+app.include_router(orders_api.router)          # /api/orders/*    (buyer: payment status)
+app.include_router(daraja_api.router)          # /api/daraja/*    (Safaricom callback)
 
 
 # ── HEALTH ────────────────────────────────────────────────────────────────────
