@@ -34,6 +34,9 @@ from app.schemas.product import (
     ResolveVideoIn,
     ResolveVideoOut,
 )
+from app.schemas.order import CheckoutIn, CheckoutOut
+from app.services import mpesa
+from app.services import orders as order_svc
 from app.services import products as svc
 from app.services import storefront as store_svc
 from app.services import tiktok_links
@@ -197,3 +200,21 @@ def resolve_video(handle: str, body: ResolveVideoIn, db: Session = Depends(get_d
         if match is not None:
             product = ProductPublicOut.model_validate(match)
     return ResolveVideoOut(video_id=video_id, product=product)
+
+
+@pages_router.post("/{handle}/checkout", response_model=CheckoutOut)
+def checkout(handle: str, body: CheckoutIn, db: Session = Depends(get_db)) -> CheckoutOut:
+    """Buyer pays: create a PENDING order and fire the M-Pesa STK prompt. Public.
+    Returns only the ACK that the prompt was SENT — the paid/failed truth arrives
+    at the Daraja callback; the UI polls GET /api/orders/{id}."""
+    try:
+        order = order_svc.start_checkout(db, handle, body.product_id, body.phone, body.quantity)
+    except order_svc.OrderError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+    except mpesa.MpesaError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    return CheckoutOut(
+        order_id=order.id,
+        status=order.status.value,
+        customer_message="Check your phone and enter your M-Pesa PIN to pay.",
+    )
