@@ -1,0 +1,7 @@
+# Keep the frontend build context lean.
+node_modules
+.next
+.git
+npm-debug.log*
+.env*.local
+README.md

@@ -42,11 +42,24 @@ and starts `uvicorn app.main:app` on `$PORT`. (`.dockerignore` keeps `.venv`,
 (`backend/media/`) don't survive a redeploy. Re-scraping re-downloads them;
 object storage (S3/R2) is the later fix (workplan M7.2).
 
-## Frontend service (later)
+## Frontend service (the shop UI buyers see)
 
-Second service, **Root Directory = `frontend`**, and set
-`NEXT_PUBLIC_API_URL` = the backend's public URL. Add the frontend's URL to the
-backend CORS allow-list before it can call the API from the browser.
+A **second** Railway service in the same repo, built by `frontend/Dockerfile`
+(Next.js standalone).
+
+1. **New service → same repo** → **Settings → Source → Root Directory = `frontend`**
+   (so Railway uses `frontend/Dockerfile`).
+2. **Variables:**
+   - `NEXT_PUBLIC_API_URL = https://projecttiktok-production.up.railway.app`
+     ⚠️ This is inlined at **build** time (it's a `NEXT_PUBLIC_*` var), so it must
+     be set *before* the build — the Dockerfile takes it as a build ARG.
+3. **Generate Domain** → gives the frontend's public URL (e.g.
+   `https://<name>.up.railway.app`) — **this is the shop link customers open.**
+4. **Let the browser call the API:** on the **backend** service, add the frontend
+   URL to `CORS_ORIGINS` (comma-separated), e.g.
+   `CORS_ORIGINS = http://localhost:3000,https://<frontend>.up.railway.app`.
+   (Server-rendered pages don't need this, but the chat/checkout/paste calls run
+   in the browser and do.)
 
 ## Custom domain
 
