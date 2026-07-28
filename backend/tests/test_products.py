@@ -333,14 +333,43 @@ def test_shop_chat_answers(client, db_session, monkeypatch):
 
     def _fake_answer(shop_name, catalogue, history, featured=None):
         captured["catalogue"] = catalogue
-        return "We have a Blue Dress for KES 500!"
+        return sales.SalesReply(reply="We have a Blue Dress for KES 500!")
 
     monkeypatch.setattr(sales, "answer", _fake_answer)
     r = client.post("/api/pages/chatshop/chat", json={"messages": [{"role": "user", "content": "got dresses?"}]})
     assert r.status_code == 200
     assert "Blue Dress" in r.json()["reply"]
+    assert r.json()["customer_captured"] is False   # nothing to capture here
     # the agent was grounded in the real catalogue
     assert any(item.name == "Blue Dress" and item.price_kes == 500 for item in captured["catalogue"])
+
+
+def test_shop_chat_captures_name_and_phone_as_a_customer(client, db_session, monkeypatch):
+    from sqlalchemy import select
+
+    from app.agent import sales
+    from app.models.customer import Customer
+
+    me = _account(db_session)
+    s = _seller(db_session, me, handle="leadshop")
+    db_session.commit()
+
+    # The bot reports it heard a name + phone this turn.
+    def _fake_answer(shop_name, catalogue, history, featured=None):
+        return sales.SalesReply(
+            reply="Asante Aisha! Nakutumia request ya M-Pesa saa hii 😊",
+            customer_name="Aisha", customer_phone="0712345678", wants_to_buy=True,
+        )
+
+    monkeypatch.setattr(sales, "answer", _fake_answer)
+    r = client.post("/api/pages/leadshop/chat", json={"messages": [{"role": "user", "content": "nataka hii, Aisha 0712345678"}]})
+    assert r.status_code == 200
+    assert r.json()["customer_captured"] is True
+
+    cust = db_session.scalar(select(Customer).where(Customer.seller_id == s.id))
+    assert cust is not None
+    assert cust.name == "Aisha"
+    assert cust.phone == "254712345678"   # normalized at the border
 
 
 def test_shop_chat_rejects_non_user_first_message(client, db_session):

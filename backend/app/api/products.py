@@ -35,6 +35,7 @@ from app.schemas.product import (
     ResolveVideoOut,
 )
 from app.schemas.order import CheckoutIn, CheckoutOut
+from app.services import customers as customer_svc
 from app.services import mpesa
 from app.services import orders as order_svc
 from app.services import products as svc
@@ -177,10 +178,16 @@ def shop_chat(handle: str, body: ChatIn, db: Session = Depends(get_db)) -> ChatO
 
     history = [{"role": m.role, "content": m.content} for m in body.messages]
     try:
-        reply = sales.answer(seller.display_name, catalogue, history, featured)
+        result = sales.answer(seller.display_name, catalogue, history, featured)
     except sales.SalesError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
-    return ChatOut(reply=reply)
+
+    # If the bot captured the buyer's phone (and maybe name), save the lead. This
+    # is the seller's contact + the number M-Pesa will charge later.
+    captured = None
+    if result.customer_phone:
+        captured = customer_svc.capture_customer(db, seller, result.customer_name, result.customer_phone)
+    return ChatOut(reply=result.reply, customer_captured=captured is not None)
 
 
 @pages_router.post("/{handle}/resolve-video", response_model=ResolveVideoOut)

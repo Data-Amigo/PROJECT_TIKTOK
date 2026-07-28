@@ -63,6 +63,19 @@ class CatalogueItem(BaseModel):
     description: str
 
 
+class SalesReply(BaseModel):
+    """The agent's turn: what to SAY, plus anything it learned about the buyer.
+
+    Structured output means one call both converses AND extracts the order
+    contact — no separate parsing pass. The code (not the model) decides what to
+    DO with a captured name/phone (persist it; later, fire the STK)."""
+
+    reply: str  # the message to show the customer (natural, 1-2 sentences)
+    customer_name: str | None = None   # the buyer's name, once they've given it
+    customer_phone: str | None = None  # the buyer's phone, once given (any format; code normalizes)
+    wants_to_buy: bool = False          # the buyer is trying to place an order
+
+
 # ── COMPREHENSION AID ─────────────────────────────────────────────────────────
 # Kenyan buyers type fast, mixed, and informal (English + Kiswahili + Sheng, with
 # typos). This is a FEW-SHOT decoder so the model reads INTENT, not textbook
@@ -120,6 +133,17 @@ def _system_prompt(shop_name: str, catalogue: list[CatalogueItem], featured: Cat
         "    GOOD:  \"Za red zimeisha kwa sasa 😔 lakini blue iko. Ungependa hiyo?\"",
         "    BAD:   \"Kwa bahati mbaya, hatuna bidhaa za rangi nyekundu kwa sasa.\"  (too formal, robotic)",
         "",
+        "CLOSING A SALE (collect the order): when the customer wants to buy — \"nataka hii\", \"niko "
+        "down\", \"I'll take it\", or they name an in-stock item to order — warmly get TWO things: their "
+        "NAME and their PHONE (the M-Pesa number). Ask for whatever's still missing, one at a time, "
+        "naturally (\"Sawa! Naomba jina lako na number ya M-Pesa nikutumie request 😊\"). Once you have "
+        "BOTH, confirm you'll send an M-Pesa request to that number. NEVER ask for their M-Pesa PIN.",
+        "",
+        "WHAT YOU RETURN: put your spoken message in `reply`. The moment the customer gives their name, "
+        "put it in `customer_name`; their phone in `customer_phone` (any format — 07.., +254.., etc.). "
+        "Set `wants_to_buy` true once they're trying to order. Leave a field null until you truly have it "
+        "— never invent a name or number.",
+        "",
         "WHAT'S TRUE — your stock list below is the ONLY source of truth. These rules are absolute:",
         "1. Say ONLY what the list states. If something isn't in it, you do NOT know it — don't fill the gap.",
         "2. COLOUR & SIZE: you do NOT track colours or sizes. NEVER say an item 'comes in red/blue', is "
@@ -130,9 +154,10 @@ def _system_prompt(shop_name: str, catalogue: list[CatalogueItem], featured: Cat
         "buyable; you may only say it'll be back. You may ONLY suggest an item shown 'in stock'.",
         "4. If everything they want is finished, say so honestly and offer to alert them when it's back. "
         "Don't invent a product, a price, a stock level, or an order status.",
-        "5. Prices are KES; if a price isn't set, say you'll confirm it. M-Pesa checkout is coming very "
-        "soon — if they want to buy, tell them to note the item name. You can't send photos here — point "
-        "them to 'Browse all products'. Never ask for a card, an M-Pesa PIN, or phone numbers.",
+        "5. Prices are KES; if a price isn't set, say you'll confirm it. You can't send photos here — "
+        "point them to 'Browse all products'. Never ask for a card number or an M-Pesa PIN. The ONE "
+        "number you DO collect is the buyer's own phone, and only when they're ready to buy (see "
+        "'CLOSING A SALE').",
         "",
         "Your stock right now:",
     ]
@@ -157,9 +182,9 @@ def answer(
     catalogue: list[CatalogueItem],
     history: list[dict],
     featured: CatalogueItem | None = None,
-) -> str:
-    """Produce the agent's next reply. `history` is the conversation so far as
-    chat messages ([{role, content}], starting with the buyer's 'user')."""
+) -> SalesReply:
+    """Produce the agent's next turn: a reply PLUS any buyer name/phone it heard.
+    `history` is the conversation so far ([{role, content}], starting 'user')."""
     if not settings.gemini_api_key:
         raise SalesError("GEMINI_API_KEY is not set — add it to .env.")
 
@@ -181,6 +206,9 @@ def answer(
                 # model); a small budget keeps replies fast/cheap. It IS counted
                 # against max_output_tokens above — hence the generous ceiling.
                 thinking_config=types.ThinkingConfig(thinking_budget=128),
+                # Structured output: one call replies AND extracts the contact.
+                response_mime_type="application/json",
+                response_schema=SalesReply,
             ),
         )
     except errors.APIError as e:
@@ -190,5 +218,7 @@ def answer(
     except Exception as e:
         raise SalesError("Had a hiccup — please try again.") from e
 
-    text = (resp.text or "").strip()
-    return text or "Pole, sijaelewa vizuri — unaweza rudia?"
+    result = resp.parsed
+    if not isinstance(result, SalesReply) or not (result.reply or "").strip():
+        return SalesReply(reply="Pole, sijaelewa vizuri — unaweza rudia?")
+    return result
