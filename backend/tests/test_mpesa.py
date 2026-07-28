@@ -55,8 +55,16 @@ def test_missing_credentials_raise_listing_what_is_missing(monkeypatch):
 
 def test_stk_push_needs_a_callback_url(monkeypatch):
     _configure(monkeypatch, mpesa_callback_url="")
-    with pytest.raises(mpesa.MpesaError, match="MPESA_CALLBACK_URL"):
+    monkeypatch.delenv("RAILWAY_PUBLIC_DOMAIN", raising=False)  # no auto-derive in this test
+    with pytest.raises(mpesa.MpesaError, match="callback URL"):
         mpesa.stk_push("0712345678", 600, "ref", "desc")
+
+
+def test_callback_url_derives_from_railway_domain(monkeypatch):
+    _configure(monkeypatch, mpesa_callback_url="")
+    monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "sokolink.up.railway.app")
+    p = mpesa.build_stk_payload("254712345678", 600, "ref", "desc")
+    assert p["CallBackURL"] == "https://sokolink.up.railway.app/api/daraja/callback"
 
 
 def test_stk_push_rejects_a_bad_phone(monkeypatch):
