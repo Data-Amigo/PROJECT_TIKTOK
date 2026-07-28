@@ -186,6 +186,63 @@ def draft_from_video(
     return draft
 
 
+# ── VIDEO PRICE FALLBACK (M1.6b) ──────────────────────────────────────────────
+# When the COVER shows no price, the seller often SPOKE it or flashed it mid-clip.
+# Gemini takes the video directly (frames + audio), so it catches both. This runs
+# ONLY when the cover pass found nothing — the cover-first, video-fallback rule.
+class VideoPrice(BaseModel):
+    """The one thing the fallback is after: a price the cover didn't show."""
+
+    price_kes: int | None = Field(
+        default=None,
+        description="Whole Kenyan shillings if a price is clearly SPOKEN or SHOWN in the video "
+        "(e.g. the seller says 'six hundred' / 'mia sita' / 'ksix', or '600' appears on screen). "
+        "null if no price is clearly stated. NEVER guess, estimate, or infer from how it looks.",
+    )
+
+
+_VIDEO_PRICE_INSTRUCTION = """You find the PRICE of a product in a short Kenyan \
+seller's TikTok video. The price may be SPOKEN (English, Swahili, or Sheng — \
+"six hundred", "mia sita", "bei ni mia tano", "ksix") or SHOWN on screen at any \
+point. Watch and listen to the whole clip.
+
+Return the whole-shilling number ONLY if a price is clearly stated for this \
+product. If unsure or you hear none, return null. NEVER guess or estimate — a \
+wrong price is worse than none."""
+
+
+def read_price_from_video(video_bytes: bytes | None, product_name: str = "") -> int | None:
+    """Watch/listen to a clip for a price the cover didn't show. Whole KES or None.
+
+    Best-effort by design: returns None on ANY problem (no key, no bytes, model
+    unsure, quota, network) — the caller then leaves the price for the seller to
+    confirm, exactly as if there'd been no video. It never raises, so it can't
+    break the cover draft that already succeeded."""
+    if not settings.gemini_api_key or not video_bytes:
+        return None
+    hint = f"The product is: {product_name}.\n" if product_name else ""
+    client = genai.Client(api_key=settings.gemini_api_key)
+    try:
+        resp = client.models.generate_content(
+            model=MODEL,
+            contents=[
+                types.Part.from_bytes(data=video_bytes, mime_type="video/mp4"),
+                f"{hint}Find the price stated in this video (spoken or on-screen).",
+            ],
+            config=types.GenerateContentConfig(
+                system_instruction=_VIDEO_PRICE_INSTRUCTION,
+                temperature=TEMPERATURE,
+                response_mime_type="application/json",
+                response_schema=VideoPrice,
+            ),
+        )
+    except Exception:
+        return None  # incl. quota — the fallback is optional, never fatal
+    result = resp.parsed
+    price = result.price_kes if isinstance(result, VideoPrice) else None
+    return price if (price is not None and price > 0) else None
+
+
 # ── SMOKE TEST ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     #   backend/.venv/Scripts/python -m app.agent.draft
