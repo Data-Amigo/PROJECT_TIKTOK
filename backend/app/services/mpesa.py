@@ -76,7 +76,7 @@ def build_stk_payload(
         "PartyA": msisdn,                       # who pays
         "PartyB": settings.mpesa_shortcode,     # who's paid (us)
         "PhoneNumber": msisdn,                  # who gets the prompt
-        "CallBackURL": settings.mpesa_callback_url,
+        "CallBackURL": settings.resolved_mpesa_callback_url,
         "AccountReference": account_reference[:12],  # Daraja caps this at 12 chars
         "TransactionDesc": description[:13] or "Payment",  # and this at 13
     }
@@ -144,10 +144,10 @@ def stk_push(phone: str, amount: int, account_reference: str, description: str) 
     The paid/failed truth arrives at the callback (M4.3). Raises MpesaError with
     a human message on any failure."""
     _require_credentials()
-    if not settings.mpesa_callback_url:
+    if not settings.resolved_mpesa_callback_url:
         raise MpesaError(
-            "MPESA_CALLBACK_URL is not set — STK Push needs a public HTTPS URL "
-            "Safaricom can POST the result to (use a tunnel in dev)."
+            "No M-Pesa callback URL — set MPESA_CALLBACK_URL, or deploy on Railway "
+            "(RAILWAY_PUBLIC_DOMAIN) / use a tunnel in local dev."
         )
     try:
         msisdn = normalize_kenyan_phone(phone)

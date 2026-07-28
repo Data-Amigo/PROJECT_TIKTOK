@@ -15,6 +15,7 @@ Why this exists (vs os.getenv sprinkled around):
 Rule: no other module reads os.environ or .env directly. Ever.
 """
 
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -85,9 +86,11 @@ class Settings(BaseSettings):
     mpesa_shortcode: str = ""          # 174379 in sandbox; your Paybill/Till in prod
     mpesa_passkey: str = ""            # Lipa Na M-Pesa Online passkey
     mpesa_env: str = "sandbox"        # "sandbox" | "production" — picks the base URL
-    # Where Safaricom POSTs the payment result. Public HTTPS only (a tunnel in
-    # dev). "callback = truth": we mark an order paid ONLY from this, never by
-    # assuming the STK succeeded. Set when the tunnel/deploy exists.
+    # Where Safaricom POSTs the payment result. Public HTTPS only. "callback =
+    # truth": we mark an order paid ONLY from this, never by assuming the STK
+    # succeeded. Usually left BLANK — resolved_mpesa_callback_url derives it from
+    # Railway's own public domain (below), so no manual variable is needed. Set
+    # this only to override (e.g. a dev tunnel, or a different domain).
     mpesa_callback_url: str = ""
 
     @property
@@ -98,6 +101,23 @@ class Settings(BaseSettings):
             if self.mpesa_env.strip().lower() == "production"
             else "https://sandbox.safaricom.co.ke"
         )
+
+    @property
+    def resolved_mpesa_callback_url(self) -> str:
+        """The public URL Safaricom POSTs the STK result to.
+
+        Prefer an explicit MPESA_CALLBACK_URL; otherwise DERIVE it from Railway's
+        auto-injected `RAILWAY_PUBLIC_DOMAIN` — so the callback just works on a
+        deploy with zero manual config (and doesn't depend on a hand-set variable
+        that's easy to forget to deploy). Empty only when neither is available
+        (pure local dev without a tunnel)."""
+        if self.mpesa_callback_url.strip():
+            return self.mpesa_callback_url.strip()
+        domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
+        if domain:
+            domain = domain.replace("https://", "").replace("http://", "").rstrip("/")
+            return f"https://{domain}/api/daraja/callback"
+        return ""
 
     # REQUIRED (no default): the app refuses to boot without a database.
     # Points at SokoLink's OWN Railway Postgres — never a shared one. We learned
