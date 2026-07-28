@@ -179,6 +179,50 @@ def test_autofill_does_not_clobber_a_seller_set_price(client, db_session, monkey
     assert body["product"]["price_kes"] == 999   # seller's price wins
 
 
+def test_video_fallback_fills_price_the_cover_missed(client, db_session, monkeypatch):
+    """Cover shows no price → watch the video for one, and persist it as a draft price."""
+    me = _account(db_session)
+    p = _product(db_session, _seller(db_session, me), vid="530")
+    p.cover_url = "covers/530.jpg"
+    p.video_download_url = "https://api.apify.com/v2/key-value-stores/x/records/v.mp4"
+    db_session.flush()
+
+    cover_draft = draft_mod.ProductDraft(  # cover found NO price
+        is_product=True, name="Ripped Jeans", description="Ripped Jeans", tags=[], suggested_price_kes=None,
+    )
+    monkeypatch.setattr(svc, "_read_cover_bytes", lambda product: b"img")
+    monkeypatch.setattr(draft_mod, "draft_from_video", lambda **kw: cover_draft)
+    monkeypatch.setattr("app.services.scraper.download_video_bytes", lambda url: b"vid")
+    monkeypatch.setattr(draft_mod, "read_price_from_video", lambda vb, product_name="": 750)  # video heard "750"
+
+    body = client.post(f"/api/products/{p.id}/autofill", headers=_auth(me)).json()
+    assert body["product"]["price_kes"] == 750       # price came from the video
+    assert body["product"]["status"] == "draft"      # still the human gate
+
+
+def test_video_fallback_skipped_when_cover_has_a_price(client, db_session, monkeypatch):
+    """Cover already gave a price → never spend a video call (the cost rail)."""
+    me = _account(db_session)
+    p = _product(db_session, _seller(db_session, me), vid="531")
+    p.cover_url = "covers/531.jpg"
+    p.video_download_url = "https://api.apify.com/v2/key-value-stores/x/records/v.mp4"
+    db_session.flush()
+
+    def _must_not_run(*a, **k):
+        raise AssertionError("video path must not run when the cover has a price")
+
+    cover_draft = draft_mod.ProductDraft(
+        is_product=True, name="Jeans", description="Jeans", tags=[], suggested_price_kes=600,
+    )
+    monkeypatch.setattr(svc, "_read_cover_bytes", lambda product: b"img")
+    monkeypatch.setattr(draft_mod, "draft_from_video", lambda **kw: cover_draft)
+    monkeypatch.setattr("app.services.scraper.download_video_bytes", _must_not_run)
+    monkeypatch.setattr(draft_mod, "read_price_from_video", _must_not_run)
+
+    body = client.post(f"/api/products/{p.id}/autofill", headers=_auth(me)).json()
+    assert body["product"]["price_kes"] == 600       # from the cover; no video touched
+
+
 def test_autodraft_drafts_all_undrafted(client, db_session, monkeypatch):
     me = _account(db_session)
     s = _seller(db_session, me, handle="autoshop")

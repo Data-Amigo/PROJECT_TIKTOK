@@ -38,6 +38,16 @@ ACTOR_ID = "GdWCkxBtKWOsKjdch"  # clockworks/tiktok-scraper
 RUN_TIMEOUT_S = 120
 DOWNLOAD_TIMEOUT_S = 30
 
+# Have Apify download the video file too (not just the cover) so the draft agent
+# can WATCH/LISTEN for a price the seller only spoke or showed mid-clip — the
+# cover-first, video-fallback path (M1.6b). mediaUrls is populated only when this
+# is on. Flip to False to save the per-scrape video-download cost.
+DOWNLOAD_VIDEOS = True
+
+# Gemini takes inline video up to ~20 MB; larger clips are skipped by the
+# fallback (the seller just confirms the price by hand, as before).
+MAX_VIDEO_BYTES = 20 * 1024 * 1024
+
 # Where OUR copies of cover images live. Local disk for the POC (served as
 # static files); the swap to object storage (S3/R2) later touches only
 # save_cover(). Gitignored — scraped media never enters git.
@@ -74,12 +84,22 @@ class TikTokVideo(BaseModel):
     authorMeta: TikTokAuthor
     videoMeta: _VideoMeta
     hashtags: list[dict] = Field(default_factory=list)
+    # Downloadable MP4 URL(s), present only when DOWNLOAD_VIDEOS is on. These are
+    # Apify key-value-store links (need our token) and are relatively short-lived,
+    # so the video fallback runs soon after the scrape (during drafting).
+    mediaUrls: list[str] = Field(default_factory=list)
 
     @property
     def hashtag_names(self) -> list[str]:
         """Flatten Apify's [{'name': 'duvets'}, ...] to ['duvets', ...] —
         the weak category hints the draft agent uses."""
         return [h["name"] for h in self.hashtags if h.get("name")]
+
+    @property
+    def video_download_url(self) -> str | None:
+        """The MP4 to hand the draft agent for a price it can only hear/see in
+        the clip. None when video download was off or unavailable."""
+        return self.mediaUrls[0] if self.mediaUrls else None
 
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -118,6 +138,7 @@ def fetch_profile(username: str, limit: int = 10) -> list[TikTokVideo]:
                 "resultsPerPage": limit,
                 "profileScrapeSections": ["videos"],
                 "commentsPerPost": 0,          # we don't need comments — don't pay for them
+                "shouldDownloadVideos": DOWNLOAD_VIDEOS,  # populates mediaUrls (video fallback)
             },
             timeout=RUN_TIMEOUT_S,
         )
@@ -190,3 +211,23 @@ def save_cover(video: TikTokVideo) -> str | None:
     # public URL prefix gets attached at serve time, so moving to S3 later
     # doesn't invalidate every DB row.
     return f"covers/{video.id}.jpg"
+
+
+def download_video_bytes(url: str | None) -> bytes | None:
+    """Fetch a scraped video's MP4 bytes for the price fallback.
+
+    The url is an Apify key-value-store link, so it carries our token. Returns
+    None on ANY failure — an expired link, a network blip, or a clip too big for
+    inline model input — because the fallback is best-effort: no video price just
+    means the seller confirms the price by hand, exactly as before. We never
+    STORE the video (transient — used once, then discarded)."""
+    if not url:
+        return None
+    headers = {"Authorization": f"Bearer {settings.apify_api_token}"} if "apify.com" in url else {}
+    try:
+        resp = httpx.get(url, headers=headers, timeout=DOWNLOAD_TIMEOUT_S, follow_redirects=True)
+        resp.raise_for_status()
+    except httpx.HTTPError:
+        return None
+    data = resp.content
+    return data if 0 < len(data) <= MAX_VIDEO_BYTES else None

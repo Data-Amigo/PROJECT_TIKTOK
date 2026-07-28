@@ -79,6 +79,12 @@ class Product(Base):
     # spike-00 gotcha). This is what the vision LLM reads and buyers see.
     cover_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Downloadable MP4 link from the scrape (Apify key-value-store URL). Used
+    # ONLY by the price fallback: when the cover shows no price, the draft agent
+    # fetches this and watches/listens for one. Short-lived, so the fallback runs
+    # during drafting (soon after the scrape). Not a stored file — fetched once.
+    video_download_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # ── Listing (LLM drafts, seller confirms) ─────────────────────────────
     name: Mapped[str] = mapped_column(String(120), default="")
     description: Mapped[str] = mapped_column(Text, default="")

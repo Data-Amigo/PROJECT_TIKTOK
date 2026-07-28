@@ -117,6 +117,7 @@ def _upsert_products(db: Session, seller: Seller, videos) -> None:
         product.video_url = v.webVideoUrl
         product.caption = v.text
         product.hashtags = v.hashtags
+        product.video_download_url = v.video_download_url  # for the price fallback
         try:
             cover = scraper.save_cover(v)
             if cover:

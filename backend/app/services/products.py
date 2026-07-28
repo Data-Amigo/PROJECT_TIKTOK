@@ -68,13 +68,7 @@ def autofill_product(
     if cover_bytes is None:
         raise ProductError("This product has no stored cover image to draft from.")
 
-    draft = draft_agent.draft_from_video(  # may raise DraftError
-        cover_bytes=cover_bytes,
-        caption=product.caption,
-        hashtags=[h.get("name", "") for h in product.hashtags],
-    )
-
-    _apply_draft(product, draft)
+    draft = _draft_product(product, cover_bytes)  # cover + video-price fallback; may raise DraftError
     db.commit()
     db.refresh(product)
     return product, draft
@@ -90,6 +84,33 @@ def _apply_draft(product: Product, draft: "draft_agent.ProductDraft") -> None:
     product.description = draft.description
     if product.price_kes is None and draft.suggested_price_kes is not None:
         product.price_kes = draft.suggested_price_kes
+
+
+def _draft_product(product: Product, cover_bytes: bytes) -> "draft_agent.ProductDraft":
+    """Cover-first draft, then the VIDEO fallback for a price the cover didn't show.
+
+    1. Draft from the cover (name/description + a printed price if visible).
+    2. If NO price landed AND we have the video, watch/listen for one — the
+       cover-first, video-fallback rule (we only spend a video call when needed).
+    The video price is a DRAFT price like any other; publish stays the human gate.
+    Raises DraftError/DraftQuotaError from the cover pass; the video step never
+    raises (best-effort)."""
+    draft = draft_agent.draft_from_video(
+        cover_bytes=cover_bytes,
+        caption=product.caption,
+        hashtags=[h.get("name", "") for h in product.hashtags],
+    )
+    _apply_draft(product, draft)  # sets name/desc + a cover price if there was one
+
+    if product.price_kes is None and product.video_download_url:
+        from app.services import scraper
+
+        video_bytes = scraper.download_video_bytes(product.video_download_url)
+        price = draft_agent.read_price_from_video(video_bytes, product_name=product.name)
+        if price is not None:
+            product.price_kes = price
+
+    return draft
 
 
 def autodraft_account(db: Session, account: Account) -> tuple[list[Product], bool]:
@@ -109,17 +130,12 @@ def autodraft_account(db: Session, account: Account) -> tuple[list[Product], boo
         if cover is None:
             continue  # no image to read; leave for the seller
         try:
-            draft = draft_agent.draft_from_video(
-                cover_bytes=cover,
-                caption=product.caption,
-                hashtags=[h.get("name", "") for h in product.hashtags],
-            )
+            _draft_product(product, cover)  # cover + video-price fallback
         except draft_agent.DraftQuotaError:
             ai_paused = True
             break  # stop — the daily cap is hit; don't burn the rest failing
         except draft_agent.DraftError:
             continue  # one unreadable image shouldn't sink the whole batch
-        _apply_draft(product, draft)
         db.commit()  # per-product → partial progress survives a later quota stop
 
     return list_account_products(db, account), ai_paused
