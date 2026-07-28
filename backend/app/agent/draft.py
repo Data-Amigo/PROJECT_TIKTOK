@@ -72,7 +72,11 @@ class ProductDraft(BaseModel):
         description="If is_product is false, a short reason (e.g. 'reply video, no product shown'); else empty",
     )
     name: str = Field(description="Short product title a shopper would recognise, e.g. 'Fluffy Duvet Set'")
-    description: str = Field(description="1-2 plain sentences describing the item, in English")
+    description: str = Field(
+        description="A minimal, business-like product label — essentially just the product NAME/type "
+        "(e.g. 'Women's Ripped Jeans', 'Denim Skirt'). NOT a sentence, NO marketing, NO features, and "
+        "NEVER a colour, size, or material you can't clearly see."
+    )
     tags: list[str] = Field(description="3-6 lowercase category keywords, e.g. ['duvet', 'bedding']")
     suggested_price_kes: int | None = Field(
         default=None,
@@ -107,7 +111,11 @@ this product, put the whole-shilling number in suggested_price_kes. If no price 
 is clearly shown, leave it null. NEVER guess or estimate a price — a wrong \
 suggested price is worse than none.
 - NEVER output a phone number or a stock quantity. Those are the seller's alone.
-- Keep the name short and the description to one or two plain English sentences.
+- Keep the name short. The description must be MINIMAL and business-like — \
+essentially just the product name/type (e.g. "Women's Ripped Jeans", "Denim \
+Skirt"). NOT a sentence, NO marketing copy, NO features, and NEVER a colour, \
+size, or material you can't clearly see. Vague claims like "available in various \
+colours/sizes" are FORBIDDEN — they mislead buyers and the sales chat.
 - If you genuinely cannot tell what the product is, say so in the name \
 ("Unclear — needs seller review") rather than guessing."""
 

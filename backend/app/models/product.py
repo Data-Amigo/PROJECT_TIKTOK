@@ -89,7 +89,11 @@ class Product(Base):
     # ever matter, the answer is integer cents — never float.
     price_kes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    stock: Mapped[int] = mapped_column(Integer, default=0)
+    # Default 1: these are mostly one-off fashion pieces, so a freshly scraped
+    # product is assumed to have one in stock (so it's available the moment it's
+    # published). The seller adjusts the count when it's more/less. default is
+    # app-side (set on INSERT); existing rows are unaffected.
+    stock: Mapped[int] = mapped_column(Integer, default=1)
 
     # native_enum=False → stored as VARCHAR + app-side enum, because native
     # Postgres enums turn "add a status" into a special migration ritual.
