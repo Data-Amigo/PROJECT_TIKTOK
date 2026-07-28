@@ -17,3 +17,5 @@ class ChatIn(BaseModel):
 
 class ChatOut(BaseModel):
     reply: str
+    # True when this turn captured the buyer's contact (name+phone) as a lead.
+    customer_captured: bool = False
