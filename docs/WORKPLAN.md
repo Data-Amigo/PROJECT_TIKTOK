@@ -131,7 +131,15 @@ logs that can reconstruct any incident.
       a designed backend-unreachable state. `NEXT_PUBLIC_` rule learned: values
       are INLINED into the browser bundle at build time — never secrets.
       *You learned:* CORS is a browser rule (server fetches skip it), Next 16
-      fetch is uncached by default, the API-client-module pattern.
+      fetch caching, the API-client-module pattern.
+      ⚠️ **Corrected 2026-08-07:** we recorded "Next 16 fetch is uncached by
+      default" — misleading, and it cost us a live bug. Uncached ≠ *dynamically
+      rendered*: a plain `fetch` in a server component still gets PRERENDERED at
+      build time. On Railway that build runs inside Docker where the backend is
+      unreachable, so the status page froze "backend unreachable" into a static
+      file served with `s-maxage=31536000` — no backend redeploy could fix it.
+      `cache: "no-store"` is what makes a route dynamic (`ƒ`, not `○`, in the
+      build output).
 
 **Done when:** uvicorn + `npm run dev` boot and the frontend shows the backend
 is healthy. ✅ MET 2026-07-23 — page renders api: ok · db: ok end to end.
@@ -439,4 +447,5 @@ first on purpose.
 | 2026-07-26 | **Auto-drafting** (seller feedback: "don't make me click auto-fill"). Products auto-draft on connect/refresh (name/desc + a readable price → DRAFT price; publish stays the human gate — guardrail v3, CONCEPTS §4). Graceful AI-cap pause + manual fallback. Auth tests randomized (collision-proof). 75 green. **Gemini billing is the gate for auto-draft + the M5 agent.** M5 reshaped into the context-aware AI sales agent (Video→Agent→Catalogue→Checkout, per-video `?v=` links, bottom-sheet catalogue) per seller's vision |
 | 2026-07-26 | M5.1 AI sales chat live (context injection, not RAG) — human persona (shop avatar/name, no bot badge), grounded rails (no invented colour/size/stock, sold-out honesty, Sheng comprehension). M5.2 paste-a-TikTok-link → feature the product (TikTok gives no per-video link/referrer; SSRF-guarded short-link resolve). Provider swung Anthropic→OpenAI→**Gemini** (paid, best at Swahili/Sheng) through the one-file agent seam. 91 green |
 | 2026-07-27 | M4.1–4.3 M-Pesa: Daraja client (OAuth+STK, live sandbox token) → Order model + checkout + idempotent callback ("callback = truth", stock drops once). Backend deployed to **Railway** (root Dockerfile fixes monorepo build). Revamp: minimal business-like descriptions + default stock 1. **M1.6b video-price fallback** — cover-first, then Gemini watches/listens to the clip for a spoken/on-screen price (probed: TikTok transcripts absent on these clips → use video). Live: 4 real clips → KES 500/550/550/600. 110 green |
+| 2026-08-07 | **Frontend deployed to Railway** as its own service (Root Directory = `frontend`) — live and correctly wired to the backend (verified by grepping the inlined `NEXT_PUBLIC_API_URL` out of the served JS chunks; no `localhost:8100` fallback shipped). Fixed a **build-time prerender freeze**: the status page had baked "backend unreachable" into a year-cached static file during the Docker build → `cache: "no-store"` makes it dynamic (see the 0.4 correction above). Backend CORS var was misspelled `CORS_ORIGIN` (singular) and silently ignored — `extra="ignore"` means no error, just a fallback to localhost. Open: `sokolink.bonganabob.com` is NXDOMAIN (CNAME never added) — matters for `MPESA_CALLBACK_URL` |
 | 2026-07-26 | **M8 planned** (seller ask): analytics + customers tabs. Verified against raw Apify payload — views/likes/**comment count** are in the scrape (not yet stored); location is NOT (seller-entered, AI-prefill from bio); "what people ask for" + link clicks must be **instrumented** (persist chat questions + event log). Decision: **start capturing early** (Phase A flywheel) so data exists when we build the views (Phase B) |
