@@ -115,7 +115,14 @@ export type HealthResponse = {
 
 export async function fetchHealth(): Promise<HealthResponse | null> {
   try {
-    const res = await fetch(`${API_URL}/health`);
+    // `cache: "no-store"` is load-bearing, not decoration. Without it Next
+    // prerenders the home page at BUILD time — inside the Docker builder, where
+    // the backend isn't reachable — and freezes "backend unreachable" into a
+    // static file served for a year (s-maxage=31536000). No backend redeploy
+    // can fix that; only a frontend rebuild. no-store also marks the route
+    // dynamic, so the status is read fresh on every request — which is the
+    // only honest behaviour for a status page. Same reason as fetchPublicPage.
+    const res = await fetch(`${API_URL}/health`, { cache: "no-store" });
     if (!res.ok) return null;
     return (await res.json()) as HealthResponse;
   } catch {
